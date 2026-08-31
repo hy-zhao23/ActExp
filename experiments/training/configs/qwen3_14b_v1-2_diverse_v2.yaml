@@ -1,0 +1,83 @@
+model:
+  name:         "Qwen/Qwen3-14B"
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.1
+  use_fsdp:     true            # FSDP FULL_SHARD across 4 ranks (1 node × 4× A100 80G)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Qwen3-14B activation pretrain, hp aligned to Qwen3-8B v1-2_diverse_v2.
+# Fills the 8B → 32B gap in the decoder-size sweep.
+# Memory: 14B bf16 ≈ 28 GiB; FULL_SHARD → ~7 GiB/GPU for weights
+#         + activations (grad-ckpt) + LoRA → fits 80 GiB/A100 comfortably.
+# Eff batch = 64 × 4 ranks × accum 6 = 1536 (matches 4B v1-2 / 8B v2 line).
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           3.0e-4
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             16
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 0.0
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       64
+      grad_accum_steps: 6
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      source: ["ag_news", "ag_news_extra",
+               "dair_emotion", "dair_emotion_extra",
+               "latentqa_control",
+               "lmsys_user", "lmsys_user_extra",
+               "md_gender",
+               "ner",
+               "scientific",
+               "sst2",
+               "tweeteval_emotion",
+               "tweeteval_sentiment", "tweeteval_sentiment_extra",
+               "wikipedia_concept", "wikipedia_event", "wikipedia_generic",
+               "wikipedia_organization", "wikipedia_person",
+               "wikipedia_place", "wikipedia_work"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.05
+      recon_ratio:   0.8
+      max_label_len: 128
+      subdir:        "finetune_diversified"
+      reps_subdir:   "finetune_diversified"
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_14b_v1-2_diverse_v2"
+      resume:     true
+
+    finetune:
+      output_dir:           "checkpoints/oracle_ft_qwen3_14b_v1-2_diverse_v2"
+      lm_lr:                1.0e-4
+      adapter_lr:           5.0e-5
+      weight_decay:         0.01
+      warmup_ratio:         0.1
+      grad_clip:            1.0
+      n_epochs:             10
+      eval_steps:           200
+      early_stop_patience:  5
+      early_stop_min_delta: 0.0
+      batch_size:           64
+      grad_accum_steps:     6
+      lora_target_modules:  "all-linear"
+      raw_subdir:           "finetune_diversified"
+      qa_subdir:            "finetune_qa_diversified"
+      reps_subdir:          "finetune_diversified"
+      train_subsample_ratio: null

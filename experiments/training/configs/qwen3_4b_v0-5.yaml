@@ -1,0 +1,65 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.05
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# v5 changes from v4-0:
+#   - adapter.n_tokens:       64 → 32         (halve soft tokens)
+#   - adapter.bottleneck_dim: (none) → 2048   (Linear(hidden→2048)→GELU→Linear(2048→n·lm))
+#   - adapter params: ~860M → ~199M  (4× smaller; output layer 839M → 168M)
+#   - model.lora_r/alpha/dropout: 16/32/0.1 → 64/128/0.05 (match AO convention)
+#   - finetune: scheme b + all-linear LoRA + ao-style LR (see finetune section)
+#   Motivation: v4-0 adapter was grossly over-parameterised (21% of Qwen3-4B).
+#   v3 and v4-0 both plateau at eval_loss ≈ 1.41 with train_loss diverging
+#   down to 1.27 → classic over-capacity / over-fit signal. Shrink the adapter
+#   before attempting to break the 1.41 floor.
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           1.0e-3
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             4
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       256        # v4-0 used 192 on 80G; v5 adapter saves ~9.5G/rank so 256 fits
+      grad_accum_steps: 2          # effective global batch: 256 × 4 × 2 = 2048
+    adapter:
+      type:           "mlp"
+      n_tokens:       32
+      dropout:        0.1
+      n_hidden:       1
+      bottleneck_dim: 2048
+    dataset:
+      source:        ["wikipedia", "scientific"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.2
+      recon_ratio:   0.8
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b_v5"
+      resume:     true
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen3_4b_v5"
+      lm_lr:               1.0e-5
+      adapter_lr:          1.0e-4
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      grad_clip:           1.0
+      n_epochs:            4
+      eval_steps:          200
+      batch_size:          32
+      grad_accum_steps:    2
+      lora_target_modules: "all-linear"

@@ -1,0 +1,96 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# data-scale ablation 2/3: v1-2 setting on diverse recon + 500k DIVERSE QA
+#
+# 实验组关系:
+#   exp 1: 500k OLD recon (1.6M wiki+sci) + 500k OLD QA  (running, job 1023830)
+#   exp 2: ~470k DIVERSE recon            + ~500k DIVERSE QA   ← 本 config
+#   exp 3: ~470k DIVERSE recon            + ~1.13M (full) DIVERSE QA  (v1-2_500k_diverse_fullqa)
+#
+# 数据量实测 (data/raw/finetune_diversified, 21 sources):
+#   raw text 总数: 469,309 records
+#     test_ratio=0.05 → train_split=445,844, test=23,465
+#     recon_ratio=0.8 → recon train=356,675 (用于 stage-1 训练)
+#   diverse QA train (only 17 sources have QA bundles, 7 _extra files dropped):
+#     total: 1,126,923 slots → train_subsample_ratio=0.4437 ≈ 500k
+#
+# Donor: Llama-3.1-8B-Instruct layer 27, hidden_dim=4096
+#   reps cache: data/representations/finetune_diversified/   (待 cache job 完成)
+#
+# Stage 1 ckpt 与 exp 3 共享:
+#   两个 finetune 都从 checkpoints/data_scale/oracle_act_v1-2_500k_diverse/final 起步.
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           3.0e-4
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             16
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 0.0
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       128
+      grad_accum_steps: 3              # eff batch = 128 × 4 × 3 = 1536
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      source: ["ag_news", "ag_news_extra",
+               "dair_emotion", "dair_emotion_extra",
+               "latentqa_control",
+               "lmsys_user", "lmsys_user_extra",
+               "md_gender",
+               "ner",
+               "scientific",
+               "sst2",
+               "tweeteval_emotion",
+               "tweeteval_sentiment", "tweeteval_sentiment_extra",
+               "wikipedia_concept", "wikipedia_event", "wikipedia_generic",
+               "wikipedia_organization", "wikipedia_person",
+               "wikipedia_place", "wikipedia_work"]
+      n_samples:     null              # 用全部 469k records
+      seed:          42
+      test_ratio:    0.05              # 0.05 → 446k train + 23k test (more train, smaller eval)
+      recon_ratio:   0.8
+      max_label_len: 128
+      subdir:        "finetune_diversified"
+      reps_subdir:   "finetune_diversified"   # Llama-3.1-8B reps (待 cache_diverse_llama 完成)
+    io:
+      output_dir: "checkpoints/data_scale/oracle_act_v1-2_500k_diverse"
+      resume:     true
+
+    finetune:
+      output_dir:           "checkpoints/data_scale/oracle_ft_v1-2_500k_diverse"
+      lm_lr:                1.0e-4
+      adapter_lr:           5.0e-5
+      weight_decay:         0.01
+      warmup_ratio:         0.1
+      grad_clip:            1.0
+      n_epochs:             10
+      eval_steps:           200
+      early_stop_patience:  5
+      early_stop_min_delta: 0.0
+      batch_size:           128
+      grad_accum_steps:     3
+      lora_target_modules:  "all-linear"
+      raw_subdir:           "finetune_diversified"      # data/raw/finetune_diversified/
+      qa_subdir:            "finetune_qa_diversified"   # data/raw/finetune_qa_diversified/
+      reps_subdir:          "finetune_diversified"      # data/representations/finetune_diversified
+      train_subsample_ratio: 0.4437                  # 500k / 1,126,923 train slots

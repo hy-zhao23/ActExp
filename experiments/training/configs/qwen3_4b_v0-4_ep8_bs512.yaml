@@ -1,0 +1,68 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  # Stage 1 实际用 r=16/α=32/dropout=0.1（与原 v0-4 保持一致）
+  # 这里的 LoRA r/α 字段仅供 Stage 2 finetune 使用
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# v0-4 ep8 + bs768: MLP baseline, smaller eff batch + more epochs.
+#   Parallel to v1-2 ep8+bs512 but keeps v0-4's physical batch=192 to avoid
+#   changing batch-size AND grad_accum at the same time. 192 doesn't divide
+#   evenly into 512 with integer accum, so we land on eff=768.
+#   Changes vs v0-4:
+#     n_epochs:            4    → 8
+#     grad_accum_steps:    2    → 1        (eff batch 1536 → 768)
+#     adapter_lr:          1e-3 → 7e-4     (sqrt rule for 2× smaller eff batch)
+#     early_stop_patience: 3    → 6
+#     output_dir renamed.
+#   NOTE: file keeps the "_ep8_bs512" suffix for naming symmetry with v1-2,
+#   but actual eff batch here is 768, not 512.
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           7.0e-4       # CHANGED: 1e-3 → 7e-4 (sqrt rule for 2× smaller eff batch)
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             8
+  eval_steps:           400             # 13333 total steps → ~33 evals
+  early_stop_patience:  3
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       192           # unchanged from v0-4
+      grad_accum_steps: 1             # CHANGED: 2 → 1, effective global: 192 × 4 × 1 = 768
+    adapter:
+      type:     "mlp"
+      n_tokens: 64
+      dropout:  0.1
+      n_hidden: 1
+    dataset:
+      source:        ["wikipedia", "scientific"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.2
+      recon_ratio:   0.8
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b_v0-4_ep8_bs512"
+      resume:     true
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen3_4b_v0-4_ep8_bs512"
+      lm_lr:               5.0e-5
+      adapter_lr:          5.0e-4
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      grad_clip:           1.0
+      n_epochs:            4
+      eval_steps:          200
+      batch_size:          128
+      grad_accum_steps:    2
+      lora_target_modules: "all-linear"

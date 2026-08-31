@@ -1,0 +1,86 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# rebuttal R2-2c: continual ft —— 从 gistcls ckpt 出发再训 factonly（~86.5k, 500k 子集）
+#
+# R2 研究问题: stage-2 QA 数据类型（gist+classification vs fact）对
+# verbalization 的贡献。本 config 只留 wikipedia factual QA，仍在 500k 子集内（ratio 0.4437）。
+# stage-1 不重训：直接复用旧 instruct-self ckpt checkpoints/oracle_act_qwen3_4b_l27_diversified/final
+# (job 1026779，旧 hp 时代训的 adapter，但结构与 v1-2 相同可加载；R2 只做组内 gistcls vs factonly 比较)
+#
+# donor = decoder = Qwen/Qwen3-4B (instruct), layer 27, 2560-d
+#   reps cache 复用: data/representations/finetune_diversified_qwen3_l27/
+# 旧 self ckpt 1026779/1027643 是旧 hp (lora_r=16, adapter_lr=1e-3) 不可比，
+# 本组用 v1-2 hp 重训 stage-1，三个 ft 变体共享。
+#
+# 变体（只改 dataset.source → ft sources_filter）:
+#   control : 全 21 sources（QA 实际 15 个）  ~422k slots  ← 本 config
+#   gistcls : 8 个非 wiki（gist+comp）        ~335k slots
+#   factonly: 7 个 wikipedia（factual）       ~86.5k slots
+# ⚠️ val 也会被 sources_filter 过滤 → 三个 run 的 best val 不同分布不可比，
+#    暂不改代码（记录在 exp_rebuttal.md 待处理），最终比较靠下游 gen-eval。
+# output_dir 全部在 checkpoints/rebuttal/，不覆盖旧实验。
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           3.0e-4
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             16
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 0.0
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       128
+      grad_accum_steps: 3              # eff batch = 128 × 4 × 3 = 1536
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      source: ["wikipedia_concept", "wikipedia_event", "wikipedia_generic",
+               "wikipedia_organization", "wikipedia_person",
+               "wikipedia_place", "wikipedia_work"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.05
+      recon_ratio:   0.8
+      max_label_len: 128
+      subdir:        "finetune_diversified"
+      reps_subdir:   "finetune_diversified_qwen3_l27"   # Qwen3-4B instruct l27 reps（已有 cache）
+    io:
+      output_dir: "checkpoints/rebuttal/oracle_act_qwen3_instr_self"
+      resume:     true
+
+    finetune:
+      output_dir:           "checkpoints/rebuttal/oracle_ft_qwen3_instr_self_gistcls_then_fact"
+      lm_lr:                1.0e-4
+      adapter_lr:           5.0e-5
+      weight_decay:         0.01
+      warmup_ratio:         0.1
+      grad_clip:            1.0
+      n_epochs:             10
+      eval_steps:           200
+      early_stop_patience:  5
+      early_stop_min_delta: 0.0
+      batch_size:           128
+      grad_accum_steps:     3
+      lora_target_modules:  "all-linear"
+      raw_subdir:           "finetune_diversified"
+      qa_subdir:            "finetune_qa_diversified"
+      reps_subdir:          "finetune_diversified_qwen3_l27"
+      train_subsample_ratio: 0.4437                  # 500k 标签，同 1029850

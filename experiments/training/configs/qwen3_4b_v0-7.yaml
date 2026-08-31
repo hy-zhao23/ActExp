@@ -1,0 +1,63 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.05
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# v0-7: single-variable ablation on v0-5 — widen bottleneck 2048 → 4096.
+#   bottleneck_dim: 4096  (was 2048 in v0-5; = in_dim)
+#   n_tokens:       32    (same as v0-5)
+#   Adapter params: ~377M  (v0-5: 199M, +90%; v0-4: 860M)
+#   Motivation: v0-5's 4096 → 5120 → 2048 → 163,840 creates a tight 60%
+#   compression (5120 → 2048). Widening the bottleneck to 4096 reduces that
+#   to a much gentler 20% compression. If v0-7 → v0-4, bottleneck width was
+#   the issue. If v0-7 ≈ v0-5, narrow bottleneck wasn't the bottleneck.
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           1.0e-3
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             4
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       192        # match v0-4 baseline
+      grad_accum_steps: 2          # effective global batch: 192 × 4 × 2 = 1536
+    adapter:
+      type:           "mlp"
+      n_tokens:       32
+      dropout:        0.1
+      n_hidden:       1
+      bottleneck_dim: 4096
+    dataset:
+      source:        ["wikipedia", "scientific"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.2
+      recon_ratio:   0.8
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b_v0-7"
+      resume:     true
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen3_4b_v0-7"
+      lm_lr:               1.0e-5
+      adapter_lr:          1.0e-4
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      grad_clip:           1.0
+      n_epochs:            4
+      eval_steps:          200
+      batch_size:          32
+      grad_accum_steps:    2
+      lora_target_modules: "all-linear"

@@ -1,0 +1,91 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# rebuttal 2/2: UAV on BASE donor — donor = Qwen3-4B-Base, decoder = Qwen3-4B
+#
+# 与 rebuttal 1/2（base self-explain）共享同一份 base donor reps，
+# 唯一变量: decoder = instruct（UAV cross-decoding）。
+# 支持 rebuttal 论点: base 模型 self-verbalization 受限，但 UAV 可读取其激活。
+#
+# Donor: Qwen3-4B-Base layer 27 last-token, hidden_dim=2560
+#   reps cache: data/representations/finetune_diversified_qwen3_base_l27/
+#
+# hp 严格 mirror v1-2_500k_diverse.yaml。可比:
+#   rebuttal 1/2 (base self)      — 同 donor，decoder base
+#   1029850 (Llama8B→Qwen3-4B 500k, best val 1.6870) — 同 decoder，donor 不同
+# Stage-2 QA: 500k 标签（ratio 0.4437）。
+# output_dir 全部放 checkpoints/rebuttal/，不覆盖任何旧实验。
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           3.0e-4
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             16
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 0.0
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       128
+      grad_accum_steps: 3              # eff batch = 128 × 4 × 3 = 1536
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      source: ["ag_news", "ag_news_extra",
+               "dair_emotion", "dair_emotion_extra",
+               "latentqa_control",
+               "lmsys_user", "lmsys_user_extra",
+               "md_gender",
+               "ner",
+               "scientific",
+               "sst2",
+               "tweeteval_emotion",
+               "tweeteval_sentiment", "tweeteval_sentiment_extra",
+               "wikipedia_concept", "wikipedia_event", "wikipedia_generic",
+               "wikipedia_organization", "wikipedia_person",
+               "wikipedia_place", "wikipedia_work"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.05
+      recon_ratio:   0.8
+      max_label_len: 128
+      subdir:        "finetune_diversified"
+      reps_subdir:   "finetune_diversified_qwen3_base_l27"   # Qwen3-4B-Base l27 reps
+    io:
+      output_dir: "checkpoints/rebuttal/oracle_act_qwen3_base_to_instr"
+      resume:     true
+
+    finetune:
+      output_dir:           "checkpoints/rebuttal/oracle_ft_qwen3_base_to_instr_500k"
+      lm_lr:                1.0e-4
+      adapter_lr:           5.0e-5
+      weight_decay:         0.01
+      warmup_ratio:         0.1
+      grad_clip:            1.0
+      n_epochs:             10
+      eval_steps:           200
+      early_stop_patience:  5
+      early_stop_min_delta: 0.0
+      batch_size:           128
+      grad_accum_steps:     3
+      lora_target_modules:  "all-linear"
+      raw_subdir:           "finetune_diversified"
+      qa_subdir:            "finetune_qa_diversified"
+      reps_subdir:          "finetune_diversified_qwen3_base_l27"
+      train_subsample_ratio: 0.4437                  # 500k 标签，同 1029850

@@ -1,0 +1,52 @@
+model:
+  name:         "Qwen/Qwen2.5-72B-Instruct"
+  lora_r:       16
+  lora_alpha:   32
+  lora_dropout: 0.1
+  use_fsdp:     true
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# FSDP SMOKE — Qwen2.5-72B, fast iteration.
+#   Purpose: validate FSDP path (wrap + first forward + first backward) on
+#   72B before committing 20+ h to full training. Tiny data + small batch +
+#   short n_epochs so it dies quickly on any FSDP bug.
+#
+#   If a few optimizer steps + 1 eval succeed → FSDP path is good, kill this
+#   and submit the full config (qwen25_72b_v1-2_diverse_fsdp.yaml).
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           1.0e-3
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             1
+  eval_steps:           20
+  early_stop_patience:  100         # disable: we want smoke to run a bit
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       4
+      grad_accum_steps: 2            # 4 × 4 × 2 = 32 (tiny, just for smoke)
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      source:        null
+      n_samples:     2000           # cap data so 1 epoch is fast
+      seed:          42
+      test_ratio:    0.05
+      recon_ratio:   1.0
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen25_72b_v1-2_diverse_fsdp_smoke"
+      resume:     false

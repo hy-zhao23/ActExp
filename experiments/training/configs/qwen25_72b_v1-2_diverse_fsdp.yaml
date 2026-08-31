@@ -1,0 +1,66 @@
+model:
+  name:         "Qwen/Qwen2.5-72B-Instruct"
+  lora_r:       16
+  lora_alpha:   32
+  lora_dropout: 0.1
+  use_fsdp:     true            # FSDP FULL_SHARD across 4 ranks (1 node × 4× A100)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Qwen2.5-72B with PyTorch FSDP (replaces the broken model_parallel + HF
+# device_map="auto" path that crashed at backward with CUDA illegal instr.).
+#
+# Topology: 2 nodes × 4× A100 80G  = 8 FSDP ranks (NVLink intra, IB inter).
+# Memory  : 72B bf16 = 144 GiB; FULL_SHARD → 18 GiB/GPU for weights.
+#           + activations (grad-ckpt) ~5 GiB + embedding replicated ~2 GiB
+#           + adapter (DDP) ~2 GiB  → ~27 GiB/GPU, plenty of 80 GiB.
+# Eff batch: 8 × 8 ranks × 24 accum = 1536 (match other v1-2 variants).
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           1.0e-3
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             4
+  eval_steps:           50         # dense ckpt for maintenance + walltime resilience
+  early_stop_patience:  3
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       8
+      grad_accum_steps: 24
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      source:        null
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.05
+      recon_ratio:   1.0
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen25_72b_v1-2_diverse"
+      resume:     true
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen25_72b_v1-2_diverse"
+      lm_lr:               1.0e-4
+      adapter_lr:          3.0e-4
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      grad_clip:           1.0
+      n_epochs:            4
+      eval_steps:          200
+      batch_size:          2
+      grad_accum_steps:    32
+      lora_target_modules: ["q_proj", "v_proj"]

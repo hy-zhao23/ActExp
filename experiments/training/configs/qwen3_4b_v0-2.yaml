@@ -1,0 +1,49 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       8       # small r to control capacity with limited data (~32k vs baseline 180k)
+  lora_alpha:   16      # = 2 * lora_r
+  lora_dropout: 0.05    # aligned with baseline (0.05)
+
+
+training:
+  lm_lr:        5.0e-5
+  adapter_lr:   1.0e-4
+  weight_decay: 0.01
+  warmup_ratio: 0.05
+  grad_clip:    1.0
+  n_epochs:     5
+  eval_steps:   200
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       192
+      grad_accum_steps: 2
+    adapter:
+      n_tokens: 64
+    dataset:
+      source:        "wikipedia"
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.1
+      recon_ratio:   0.8
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b"
+      resume:     false
+    finetune:
+      # scheme a only: frozen adapter, LoRA only
+      # 2 GPU × batch=32 × grad_accum=1 → effective global = 64 (= baseline)
+      # baseline: lr=1e-5, batch=64 → direct match, no scaling needed
+      output_dir:          "checkpoints/oracle_ft_qwen3_4b_v2"
+      lm_lr:               1.0e-5   # aligned with baseline (1e-5, batch=64)
+      adapter_lr:          1.0e-5   # scheme b only; same as lm_lr
+      weight_decay:        0.01
+      warmup_ratio:        0.1      # baseline uses 10% warmup
+      min_lr_ratio:        0.033    # cosine floor ≈ 3.3e-7; vs baseline linear-to-0
+      grad_clip:           1.0
+      n_epochs:            2        # baseline ~2800 steps; we get ~1000 steps (32k/64×2) — enough to converge
+      eval_steps:          200
+      batch_size:          32
+      grad_accum_steps:    1        # effective global = 32×2×1 = 64
+      lora_target_modules: "all-linear"   # aligned with baseline; small r=8 controls capacity

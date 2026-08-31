@@ -1,0 +1,74 @@
+model:
+  name:               "Qwen/Qwen2.5-72B-Instruct"
+  lora_r:             16
+  lora_alpha:         32
+  lora_dropout:       0.1
+  model_parallel:     true       # shard frozen LM across 4 local GPUs (naive PP)
+  max_memory_per_gpu: "70GiB"    # leave ~10 GiB/GPU for activations + adapter
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# decoder-scaling experiment — Qwen2.5-72B decoder, v1-2 architecture.
+#   Donor : Llama-3.1-8B-Instruct @ layer 27 (existing cache: finetune_diversified/)
+#   Decoder: Qwen2.5-72B-Instruct  (NB: Qwen2.5 ≠ Qwen3 — single point, not
+#            same-family with the 0.6/4/8/32B Qwen3 scaling curve)
+#   Adapter: cross-attn Q-Former (2 stacked CrossAttn+FFN blocks)
+#   Data  : finetune_diversified (21 sources Stage1 / 17 QA Stage2)
+#
+# Layout: 2 nodes × 4× A100 80G; each node = 1 DDP rank with the LM sharded
+#         across its 4 GPUs via HF `device_map="auto"` (naive pipeline).
+#         Capacity: 72B × bf16 ≈ 144 GiB / 4 cards ≈ 36 GiB/card; 70 GiB
+#         ceiling leaves ample activation room.
+#         Throughput: only ~1 GPU "effectively" active per node (naive PP) →
+#         wall-clock ≈ 25 h for 4 epochs (vs 17 h for 32B on 1× A100).
+#
+# Parallel to qwen3_{0_6,4,8,32}b_v1-2_diverse.yaml (different family).
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           1.0e-3
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             4
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       64
+      grad_accum_steps: 12       # eff global: 64 × 2 ranks × 12 = 1536  (match 4B/8B/32B)
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      source:        null        # auto-discover 21 sources under finetune_diversified
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.05
+      recon_ratio:   1.0
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen25_72b_v1-2_diverse"
+      resume:     true
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen25_72b_v1-2_diverse"
+      lm_lr:               1.0e-4
+      adapter_lr:          3.0e-4
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      grad_clip:           1.0
+      n_epochs:            4
+      eval_steps:          200
+      batch_size:          2          # LoRA grads enlarge memory; tune after Stage1 done
+      grad_accum_steps:    32         # eff: 2 × 2 × 32 = 128 (match 32B's 4 × 4 × 16 = 256? — TBD)
+      lora_target_modules: ["q_proj", "v_proj"]

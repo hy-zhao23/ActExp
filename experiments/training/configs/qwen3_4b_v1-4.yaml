@@ -1,0 +1,78 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       16
+  lora_alpha:   32
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# v1-4: scale-up of v1-2 — deepen + widen context (v1-3 + n_contexts).
+#   Two-axis ablation building on v1-3 (which adds depth alone). Heads kept
+#   at 8 (matching v1-2) to avoid the head-count confound that contaminated
+#   the original v1-3/v1-4 runs.
+#
+#   Changes from v1-2:
+#     n_layers:   2 → 4     (same as v1-3)
+#     n_heads:    8         (unchanged)
+#     n_contexts: 8 → 16    (NEW axis vs v1-3)
+#   Pipeline:
+#     activation (4096) → Linear → 16 context tokens (each 2560-d)
+#     64 learnable queries → 4 × (CrossAttn(8-head) + FFN 4×) → LayerNorm → 64 soft tokens
+#   Param breakdown:
+#     context_proj        4096 × 16·2560                  = 167.8M  ← 2× v1-3
+#     per layer: CrossAttn 26.2M + FFN 52.4M              = 78.6M × 4 = 314.4M
+#     queries + LNs                                       = 0.17M
+#     TOTAL                                               ≈ 482.7M  (+100% vs v1-2 241M)
+#   Comparison axes:
+#     v1-2 → v1-3:  +depth (single axis)
+#     v1-3 → v1-4:  +context (single axis on top of v1-3's depth)
+#     v1-2 → v1-4:  +depth +context (joint effect)
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           3.0e-4    # match v1-2/v1-3
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             16        # match v1-2_ep16 / v1-3 for fair comparison
+  eval_steps:           200
+  early_stop_patience:  3         # ep12 onward usually plateaus (v1-2_ep16 evidence)
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       96        # match v1-3 for apples-to-apples timing
+      grad_accum_steps: 4         # effective global: 96 × 4 × 4 = 1536 (match v0-4/v1-2/v1-3)
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 16              # CHANGED vs v1-3: 8 → 16 (the new ablation axis)
+      n_heads:    8               # unchanged from v1-2
+      n_layers:   4               # same as v1-3
+      ffn_mult:   4
+    dataset:
+      source:        ["wikipedia", "scientific"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.2
+      recon_ratio:   0.8
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b_v1-4"
+      resume:     true
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen3_4b_v1-4"
+      lm_lr:               1.0e-4
+      adapter_lr:          3.0e-4
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      grad_clip:           1.0
+      n_epochs:            4
+      eval_steps:          200
+      batch_size:          32
+      grad_accum_steps:    2
+      lora_target_modules: ["q_proj", "v_proj"]

@@ -1,0 +1,70 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  # Stage 1 pretrain实际运行时用的是 r=16/α=32/dropout=0.1（已训完，checkpoints/oracle_act_qwen3_4b_v4-0/best）
+  # 这里的值是给 Stage 2 finetune 用（AO-style LoRA：r=64/α=128，保持 dropout=0.1）
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# v0-4 ep8_2M (clean LR-floor ablation, 2026-04-25):
+#   Goal: test whether v0-4 baseline plateau (best eval=1.6205 at step 9400)
+#   was caused by cosine LR decaying too low in late epochs (4-ep schedule
+#   reaches ~7e-5 adapter_lr by step 9400) vs a true data/capacity ceiling.
+#
+#   Conceptual changes vs v0-4 baseline:
+#     n_epochs:              4    → 8
+#     train_subsample_ratio: 1.0  → 0.617   (3.24M → 2M, per-source stratified)
+#     adapter_lr:            5e-4 → 5e-5    (Stage 1 已 align adapter，Stage 2 不该扰动)
+#   Everything else (eff_batch=1024, lm_lr=5e-5, warmup, min_lr) unchanged.
+#
+#   Compute: ~53h wall × 4 GPUs = 212 GPU·h (vs baseline 172) — fits 60h job.
+#   Eval split is NOT subsampled — directly comparable to baseline best=1.6205.
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           1.0e-3
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             4
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       192
+      grad_accum_steps: 2
+    adapter:
+      type:     "mlp"          # baseline MLPAdapter
+      n_tokens: 64
+      dropout:  0.1
+      n_hidden: 1
+    dataset:
+      source:        ["wikipedia", "scientific"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.2
+      recon_ratio:   0.8
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b_v0/v0-4"
+      resume:     true
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen3_4b_v0-4_ep8_2M"
+      lm_lr:               5.0e-5         # AO-style: was 1e-4
+      adapter_lr:          5.0e-5         # CHANGED: 5e-4 → 5e-5 (Stage 1 已 align adapter，Stage 2 不该扰动)
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      grad_clip:           1.0
+      n_epochs:            8              # CHANGED vs v0-4 baseline: 4 → 8 (test LR-floor hypothesis)
+      eval_steps:          200
+      batch_size:          128            # 80G A100: Stage 2 LoRA all-linear 反传比 Stage 1 更吃显存，128 保险
+      grad_accum_steps:    3              # 4 ranks × 128 × 3 = eff batch 1536（与 v1-x oracle ACT 系列对齐）
+      lora_target_modules: "all-linear"
+      train_subsample_ratio: 0.617        # CHANGED vs v0-4 baseline: 3.24M → 2M (per-source stratified, seed=42 in dataset)

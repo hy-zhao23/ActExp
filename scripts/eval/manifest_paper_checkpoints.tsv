@@ -1,0 +1,43 @@
+paper_ref	tier	tag	checkpoint_kind	source_relpath	config	notes
+Fig3,Fig6	main	main_stage1	stage1	data_scale/oracle_act_v1-2_500k_diverse/final	data_scale/v1-2_500k_diverse_fullqa.yaml	Shared Llama-8B to Qwen3-4B activation-to-text adapter
+Table1,Table2,Table3,Table4,Fig3,Fig4,Fig5,Fig6,Fig8,Fig11	main	main_llama8b_qwen3_4b	stage2	data_scale/oracle_ft_v1-2_500k_diverse_fullqa/final	data_scale/v1-2_500k_diverse_fullqa.yaml	Default Full UAV and QF-LoRA row
+Table1	paper_ablation	mlp_b1_1024	stage2	data_scale/oracle_ft_v0-13_500k_diverse_fullqa/final	data_scale/v0-13_500k_diverse_fullqa.yaml	MLP-B1 bottleneck 1024
+Table1	paper_ablation	mlp_b2_2048	stage2	data_scale/oracle_ft_v0-5_500k_diverse_fullqa/final	data_scale/v0-5_500k_diverse_fullqa.yaml	MLP-B2 bottleneck 2048
+Table1	paper_ablation	mlp_b3_t3_3072_64tok	stage2	data_scale/oracle_ft_v0-8_500k_diverse_fullqa/final	data_scale/v0-8_500k_diverse_fullqa.yaml	Shared by MLP-B3 and MLP-T3
+Table1	paper_ablation	mlp_b4_no_bottleneck	stage2	data_scale/oracle_ft_v0-4_500k_diverse_fullqa/final	data_scale/v0-4_500k_diverse_fullqa.yaml	MLP-B4 no bottleneck
+Table1	paper_ablation	mlp_t1_8tok	stage2	data_scale/oracle_ft_v0-10_500k_diverse_fullqa/final	data_scale/v0-10_500k_diverse_fullqa.yaml	MLP-T1 8 soft tokens
+Table1	paper_ablation	mlp_t2_16tok	stage2	data_scale/oracle_ft_v0-11_500k_diverse_fullqa/final	data_scale/v0-11_500k_diverse_fullqa.yaml	MLP-T2 16 soft tokens
+Table1	paper_ablation	mlp_t4_128tok	stage2	data_scale/oracle_ft_v0-12_500k_diverse_fullqa/final	data_scale/v0-12_500k_diverse_fullqa.yaml	MLP-T4 128 soft tokens
+Table1	paper_ablation	qf_base	stage2	data_scale/oracle_ft_v1-1_500k_diverse_fullqa/final	data_scale/v1-1_500k_diverse_fullqa.yaml	QF-Base 1 layer 8 contexts LoRA 16/32
+Table1	paper_ablation	qf_deep	stage2	data_scale/oracle_ft_v1-3_500k_diverse_fullqa/final	data_scale/v1-3_500k_diverse_fullqa.yaml	QF-Deep 4 layers 8 contexts LoRA 16/32
+Table1	paper_ablation	qf_wide	stage2	data_scale/oracle_ft_v1-4_500k_diverse_fullqa/final	data_scale/v1-4_500k_diverse_fullqa.yaml	QF-Wide 4 layers 16 contexts LoRA 16/32
+Table2,Fig5a,Fig10	paper_ablation	qwen3_4b_self_l27	stage2	oracle_ft_qwen3_4b_l27_diversified/final	qwen3_4b_l27_diversified.yaml	Qwen3-4B Full self-decoding and layer 27
+Table2	paper_ablation	qwen3_4b_aot_from_llama	stage2	frozen_decoder/qwen3_4b_llama8b_to_self_fullqa/final	frozen_decoder_qwen3_4b_llama8b_to_self_fullqa.yaml	AOT for Qwen donor using LoRA learned from Llama donor
+Table2	paper_ablation	llama8b_aot_from_qwen	stage2	frozen_decoder/qwen3_4b_self_to_llama8b_fullqa/final	frozen_decoder_qwen3_4b_self_to_llama8b_fullqa.yaml	AOT for Llama donor using LoRA learned from Qwen donor
+Table2,Fig4,Fig7	paper_ablation	llama8b_self	stage2	data_scale/oracle_ft_v1-2_diverse_llama8b_self_fullqa/final	data_scale/v1-2_diverse_llama8b_self.yaml	Llama-8B Full self-decoding
+Table3,Fig4,Fig7	paper_ablation	gemma3_4b_cross	stage2	data_scale/oracle_ft_v1-2_diverse_gemma3_4b_fullqa/final	data_scale/v1-2_diverse_gemma3_4b.yaml	Gemma-3-4B donor with shared Qwen3-4B decoder
+Table3,Fig4,Fig7	paper_ablation	gemma3_12b_cross	stage2	data_scale/oracle_ft_v1-2_diverse_gemma3_12b_fullqa/final	data_scale/v1-2_diverse_gemma3_12b.yaml	Gemma-3-12B donor with shared Qwen3-4B decoder
+Table12	paper_ablation	gemma3_12b_cross_efficiency	stage2	data_scale/oracle_ft_v1-2_diverse_gemma3_12b_fullqa_v2/final	data_scale/v1-2_diverse_gemma3_12b_v2.yaml	Cross-decoding checkpoint whose validation loss is 1.6594
+Table3,Table15	paper_ablation	yi15_34b_cross	stage2	data_scale/oracle_ft_v1-2_diverse_yi15_34b_fullqa/final	data_scale/v1-2_diverse_yi15_34b.yaml	Yi-1.5-34B donor with shared Qwen3-4B decoder
+Table4,Fig8	paper_ablation	decoder_qwen3_0_6b	stage2	oracle_ft_qwen3_0_6b_v1-2_diverse_v2/final	qwen3_0_6b_v1-2_diverse_v2.yaml	Decoder scaling 0.6B point
+Table4,Fig8	paper_ablation	decoder_qwen3_8b	stage2	oracle_ft_qwen3_8b_v1-2_diverse_v4_adlr1e-4/final	qwen3_8b_v1-2_diverse_v4_adlr1e-4.yaml	Final 8B point; matches validation loss 1.5634
+Table4,Fig8	paper_ablation	decoder_qwen3_14b	stage2	oracle_ft_qwen3_14b_v1-2_diverse_v2/final	qwen3_14b_v1-2_diverse_v2.yaml	Decoder scaling 14B point
+Fig4,Fig7	paper_ablation	gemma3_4b_self	stage2	data_scale/oracle_ft_v1-2_diverse_gemma3_4b_self_fullqa/final	data_scale/v1-2_diverse_gemma3_4b_self.yaml	Gemma-3-4B self-decoding
+Fig4,Fig7,Table12	paper_ablation	gemma3_12b_self	stage2	data_scale/oracle_ft_v1-2_diverse_gemma3_12b_self_fullqa/final	data_scale/v1-2_diverse_gemma3_12b_self.yaml	Gemma-3-12B self-decoding and efficiency comparison
+Fig5b,Fig11	paper_ablation	data_200k	stage2	data_scale/oracle_ft_v1-2_200k_diverse/final	data_scale/v1-2_200k_diverse.yaml	200K Stage-2 QA pairs
+Fig5b,Fig6,Fig11	paper_ablation	data_422k	stage2	data_scale/oracle_ft_v1-2_500k_diverse/final	data_scale/v1-2_500k_diverse.yaml	422K Stage-2 QA pairs; legacy path says 500k
+Fig5b,Fig11	paper_ablation	data_750k	stage2	data_scale/oracle_ft_v1-2_750k_diverse/final	data_scale/v1-2_750k_diverse.yaml	750K Stage-2 QA pairs
+Fig6	paper_ablation	no_stage1_422k	stage2	data_scale/oracle_ft_v1-2_500k_diverse_nostage1/final	data_scale/v1-2_500k_diverse_nostage1.yaml	Randomly initialized adapter without Stage-1 warmup at 422K
+Fig6	paper_ablation	no_stage1_951k	stage2	data_scale/oracle_ft_v1-2_diverse_fullqa_nostage1/final	data_scale/v1-2_diverse_fullqa_nostage1.yaml	Randomly initialized adapter without Stage-1 warmup at 951K
+Fig5a,Fig10	paper_ablation	qwen3_4b_self_l3	stage2	oracle_ft_qwen3_4b_l3_diversified/final	qwen3_4b_l3_diversified.yaml	Layer ablation 3
+Fig5a,Fig10	paper_ablation	qwen3_4b_self_l9	stage2	oracle_ft_qwen3_4b_l9_diversified/final	qwen3_4b_l9_diversified.yaml	Layer ablation 9
+Fig5a,Fig10	paper_ablation	qwen3_4b_self_l15	stage2	oracle_ft_qwen3_4b_l15_diversified/final	qwen3_4b_l15_diversified.yaml	Layer ablation 15
+Fig5a,Fig10	paper_ablation	qwen3_4b_self_l21	stage2	oracle_ft_qwen3_4b_l21_diversified/final	qwen3_4b_l21_diversified.yaml	Layer ablation 21
+Fig5a,Fig10	paper_ablation	qwen3_4b_self_l33	stage2	oracle_ft_qwen3_4b_l33_diversified/final	qwen3_4b_l33_diversified.yaml	Layer ablation 33
+Table5	paper_ablation	task_class_gist	stage2	rebuttal/oracle_ft_qwen3_instr_self_500k_gistcls/final	rebuttal/qwen3_4b_instr_self_500k_gistcls.yaml	Classification and gist Stage-2 training
+Table5	paper_ablation	task_class_gist_then_fact	stage2	rebuttal/oracle_ft_qwen3_instr_self_gistcls_then_fact/final	rebuttal/qwen3_4b_instr_self_gistcls_then_fact.yaml	Sequential extension to fact retrieval
+Table5,Table13	paper_ablation	task_joint_seed42	stage2	rebuttal/oracle_ft_qwen3_instr_self_500k/final	rebuttal/qwen3_4b_instr_self_500k.yaml	Joint training and stability seed 42
+Table13	reproducibility	stability_seed43	stage2	rebuttal/oracle_ft_qwen3_instr_self_500k_seed43/final	rebuttal/qwen3_4b_instr_self_500k.yaml	Training stability repeat
+Table13	reproducibility	stability_seed44	stage2	rebuttal/oracle_ft_qwen3_instr_self_500k_seed44/final	rebuttal/qwen3_4b_instr_self_500k.yaml	Training stability repeat
+Table13	reproducibility	stability_seed45	stage2	rebuttal/oracle_ft_qwen3_instr_self_500k_seed45/final	rebuttal/qwen3_4b_instr_self_500k.yaml	Training stability repeat
+Table13	reproducibility	stability_seed46	stage2	rebuttal/oracle_ft_qwen3_instr_self_500k_seed46/final	rebuttal/qwen3_4b_instr_self_500k.yaml	Training stability repeat

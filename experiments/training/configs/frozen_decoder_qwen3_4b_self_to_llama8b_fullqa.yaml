@@ -1,0 +1,91 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Frozen-decoder remap: keep qwen3-4b LM+LoRA (from self-donor stage-2 ft) frozen,
+# train a FRESH cross-attn adapter for Llama-3.1-8B donor on full diversified QA.
+#
+#   Decoder source  = checkpoints/oracle_ft_qwen3_4b_l27_diversified/final
+#                     (qwen3-self stage2 ft, donor was qwen3-4b@l27)
+#   New donor       = Llama-3.1-8B (hidden=4096, default layer cache:
+#                     data/representations/finetune_diversified)
+#   Training mode   = stage-2 ft format (Q+act → A), but only the adapter is
+#                     trainable. lm_lr is ignored (no LM/LoRA param group).
+#
+# Step budget (eff batch=1536): ~1.13M / 1536 ≈ 734 steps/ep × 10 ep ≈ 7,340 steps
+# Wall: similar to v1-2 fullqa (~16-22h), but no LM/LoRA backward → ~30% faster.
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                0.0
+  adapter_lr:           3.0e-4
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             16
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 0.0
+
+tasks:
+  activation:
+    # NOTE: stage-1 block is a placeholder only; finetune entry-point doesn't
+    # retrain stage-1. The decoder LM+LoRA come from --decoder-ckpt.
+    task_training:
+      batch_size:       128
+      grad_accum_steps: 3
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      source: ["ag_news", "ag_news_extra",
+               "dair_emotion", "dair_emotion_extra",
+               "latentqa_control",
+               "lmsys_user", "lmsys_user_extra",
+               "md_gender",
+               "ner",
+               "scientific",
+               "sst2",
+               "tweeteval_emotion",
+               "tweeteval_sentiment", "tweeteval_sentiment_extra",
+               "wikipedia_concept", "wikipedia_event", "wikipedia_generic",
+               "wikipedia_organization", "wikipedia_person",
+               "wikipedia_place", "wikipedia_work"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.05
+      recon_ratio:   0.8
+      max_label_len: 128
+      subdir:        "finetune_diversified"
+      reps_subdir:   "finetune_diversified"
+    io:
+      output_dir: "checkpoints/frozen_decoder/qwen3_4b_self_to_llama8b_fullqa"  # placeholder, ft writes its own
+      resume:     true
+
+    finetune:
+      output_dir:           "checkpoints/frozen_decoder/qwen3_4b_self_to_llama8b_fullqa"
+      lm_lr:                0.0                     # unused (LoRA frozen)
+      adapter_lr:           5.0e-4                  # higher than v1-2 ft (only adapter is learning)
+      weight_decay:         0.01
+      warmup_ratio:         0.1
+      grad_clip:            1.0
+      n_epochs:             10
+      eval_steps:           200
+      early_stop_patience:  5
+      early_stop_min_delta: 0.0
+      batch_size:           128
+      grad_accum_steps:     3
+      lora_target_modules:  "all-linear"            # placeholder (LoRA loaded from decoder-ckpt)
+      raw_subdir:           "finetune_diversified"
+      qa_subdir:            "finetune_qa_diversified"
+      reps_subdir:          "finetune_diversified"
+      train_subsample_ratio: null

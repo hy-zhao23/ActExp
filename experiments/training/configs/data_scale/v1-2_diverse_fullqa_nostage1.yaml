@@ -1,0 +1,89 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# stage-1 ABLATION: 跳过 stage-1 recon pretrain, 直接 adapter+LoRA 联合 ft
+#                   on full diverse QA.
+#
+# 对比关系:
+#   1023973 (v1-2 fullqa, 有 stage 1)   : stage-1 recon → stage-2 ft on 1.13M
+#   ↑ 本 config (no stage 1)             : 跳过 stage-1, 直接 ft on 1.13M
+#
+#   唯一变量 = 是否 stage-1 recon 预训.
+#   回答问题: 「stage 1 recon 是否必要 / 提供多少增益?」
+#
+# 实现:
+#   - oracle_finetune.py 现在允许 --stage1-ckpt 不传 → adapter 从 scratch init
+#   - dataset.* 字段会被 finetune 流程忽略, 但 schema 要求所以保留占位
+#
+# Donor reps (Llama-3.1-8B): data/representations/finetune_diversified/   (cache 完成)
+# Raw text:  data/raw/finetune_diversified/
+# QA:        data/raw/finetune_qa_diversified/
+#
+# Step budget (eff batch=1536, ~1.13M QA train):
+#   734 steps/ep × 10 ep ≈ 7,340 steps  (~22h 实际)
+#
+# ⚠ 风险: adapter 从 random init, 早期可能 loss 起步很高 (>5)
+#         默认 warmup_ratio=0.1 (~734 step warmup) 应该够稳
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5         # stage-1 占位, finetune.* 覆盖
+  adapter_lr:           3.0e-4
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             16
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 0.0
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       128
+      grad_accum_steps: 3
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      # 占位 — finetune 流程不读 stage-1 数据
+      source:        ["ag_news"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.05
+      recon_ratio:   0.8
+      max_label_len: 128
+      subdir:        "finetune_diversified"
+      reps_subdir:   "finetune_diversified"
+    io:
+      output_dir: "checkpoints/data_scale/oracle_act_v1-2_500k_diverse"   # 占位 (不会被 finetune 写)
+      resume:     true
+
+    finetune:
+      output_dir:           "checkpoints/data_scale/oracle_ft_v1-2_diverse_fullqa_nostage1"
+      lm_lr:                1.0e-4
+      adapter_lr:           5.0e-5     # 与 1023973 fullqa 一致;  random adapter 也用同样 lr 做对照
+      weight_decay:         0.01
+      warmup_ratio:         0.1
+      grad_clip:            1.0
+      n_epochs:             10
+      eval_steps:           200
+      early_stop_patience:  5
+      early_stop_min_delta: 0.0
+      batch_size:           128
+      grad_accum_steps:     3          # eff batch = 128 × 4 × 3 = 1536
+      lora_target_modules:  "all-linear"
+      raw_subdir:           "finetune_diversified"
+      qa_subdir:            "finetune_qa_diversified"
+      reps_subdir:          "finetune_diversified"
+      train_subsample_ratio: null      # full ~1.13M QA train slots

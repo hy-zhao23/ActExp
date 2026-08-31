@@ -1,0 +1,19 @@
+{
+  "g2f": {
+    "nonwiki": {
+      "loss": 2.2542,
+      "ppl": 9.528,
+      "n_samples": 8010
+    },
+    "wiki": {
+      "loss": 1.6343,
+      "ppl": 5.126,
+      "n_samples": 7006
+    },
+    "full": {
+      "loss": 1.9623,
+      "ppl": 7.115,
+      "n_samples": 15016
+    }
+  }
+}

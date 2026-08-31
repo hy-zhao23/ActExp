@@ -1,0 +1,41 @@
+# Diversified mix — physical-extraction target.
+#
+# Per-source training-row caps. eval rows (last min(250, 20%) per source) are
+# always preserved. Set cap to 0 (or omit) to drop the source entirely.
+#
+# Used by:
+#   scripts/extract_diversified.py   (physical jsonl + qa + reps subset)
+#   utils/finetune_dataset.py        (if used as runtime mix_caps; omit cap → no cap)
+
+mix_caps:
+  # ── wikipedia: 7 subtypes × 7k = ~49k ──────────────────────────
+  wikipedia_concept:        7000
+  wikipedia_event:          7000
+  wikipedia_generic:        7000
+  wikipedia_organization:   7000
+  wikipedia_person:         7000
+  wikipedia_place:          7000
+  wikipedia_work:           7000
+
+  # ── core long-form ─────────────────────────────────────────────
+  scientific:              50000
+  ag_news:                 50000
+
+  # ── classification (full) ──────────────────────────────────────
+  sst2:                    18254     # full
+  md_gender:               29857     # full
+  ner:                     14923     # full
+  latentqa_control:        16490     # full
+  tweeteval_emotion:        3074     # full
+  tweeteval_sentiment:     20000     # subset from 45k
+
+  # ── new diversified sources ────────────────────────────────────
+  lmsys_user:              20000     # full (in finetune_new/)
+  dair_emotion:            19912     # full (in finetune_new/)
+
+  # ── dropped ────────────────────────────────────────────────────
+  tweeteval_stance:            0     # 55% noise (text doesn't mention target)
+
+# Eval split convention: tail of each per-source jsonl, capped at 20%
+eval_per_source: 250
+seed: 42

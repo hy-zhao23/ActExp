@@ -1,0 +1,64 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  # Stage 2 finetune 用的 LoRA 设置（保留 v0-4 的 AO-style r=64/α=128）
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# v0-9: MLP baseline，沿用 v0-3 的 lr=3e-4 + v0-4 的 dropout=0.1，把 epoch 拉长。
+#   动机：v0-3 在 lr=3e-4 / ep=3 (step 3200) 早停 loss 1.4099；v0-4 用 1e-3 +
+#   dropout 想加速，但小模型 + 大 lr 更容易过拟。回到稳定的 3e-4，给足时间收敛。
+#   q-former (v1-2) 同样用 3e-4 跑稳，MLP 没理由要更小。
+#   Changes vs v0-4:
+#     adapter_lr:          1e-3 → 3e-4    (回到 v0-3 验证过的设置)
+#     n_epochs:            4    → 16      (给 MLP 充分收敛 + ES 控制)
+#     early_stop_patience: 3    → 6
+#   eff batch 保持 1536（192 × 4 ranks × 2 grad_accum），不引入 batch 变量。
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           3.0e-4       # CHANGED: 1e-3 → 3e-4 (v0-3 验证稳; q-former 同设)
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             16           # CHANGED: 4 → 16
+  eval_steps:           400
+  early_stop_patience:  3
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       192          # 与 v0-4 相同
+      grad_accum_steps: 2            # 与 v0-4 相同, eff = 192 × 4 × 2 = 1536
+    adapter:
+      type:     "mlp"
+      n_tokens: 64
+      dropout:  0.1
+      n_hidden: 1
+    dataset:
+      source:        ["wikipedia", "scientific"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.2
+      recon_ratio:   0.8
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b_v0/v0-9"
+      resume:     true
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen3_4b_v0-9"
+      lm_lr:               5.0e-5
+      adapter_lr:          5.0e-4
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      grad_clip:           1.0
+      n_epochs:            4
+      eval_steps:          200
+      batch_size:          128
+      grad_accum_steps:    2
+      lora_target_modules: "all-linear"

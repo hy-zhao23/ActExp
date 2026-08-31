@@ -1,0 +1,69 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# v0-4 ft rerun with lr aligned to v0-5/7/8/10/11/12/13 (lm_lr=1e-5,
+# adapter_lr=1e-4) so v0-4 becomes a clean "no-bottleneck MLP" data point in
+# the bottleneck-dim sweep. Reuses Stage 1 act ckpt 1024483 (act hp unchanged).
+# Old ckpt at oracle_ft_v0-4_500k_diverse_fullqa/ (best val 1.6738, AO-style
+# higher lr) preserved.
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-05
+  adapter_lr:           1.0e-03
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             16
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 0.0
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       128
+      grad_accum_steps: 3
+    adapter:
+      type:        "mlp"
+      n_tokens:    64
+      dropout:     0.1
+      n_hidden:    1
+    dataset:
+      source: ["ag_news", "ag_news_extra", "dair_emotion", "dair_emotion_extra", "latentqa_control", "lmsys_user",
+               "lmsys_user_extra", "md_gender", "ner", "scientific", "sst2", "tweeteval_emotion", "tweeteval_sentiment", "tweeteval_sentiment_extra",
+               "wikipedia_concept", "wikipedia_event", "wikipedia_generic", "wikipedia_organization", "wikipedia_person", "wikipedia_place", "wikipedia_work"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.05
+      recon_ratio:   0.8
+      max_label_len: 128
+      subdir:        "finetune_diversified"
+      reps_subdir:   "finetune_diversified"
+    io:
+      output_dir: "checkpoints/data_scale/oracle_act_v0-4_500k_diverse"
+      resume:     true
+
+    finetune:
+      output_dir:           "checkpoints/data_scale/oracle_ft_v0-4_500k_diverse_fullqa_alignedlr"
+      lm_lr:                1.0e-05
+      adapter_lr:           1.0e-04
+      weight_decay:         0.01
+      warmup_ratio:         0.1
+      grad_clip:            1.0
+      n_epochs:             10
+      eval_steps:           200
+      early_stop_patience:  5
+      early_stop_min_delta: 0.0
+      batch_size:           128
+      grad_accum_steps:     3
+      lora_target_modules:  "all-linear"
+      raw_subdir:           "finetune_diversified"
+      qa_subdir:            "finetune_qa_diversified"
+      reps_subdir:          "finetune_diversified"
+      train_subsample_ratio: null

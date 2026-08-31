@@ -1,0 +1,53 @@
+{
+  "gistcls": {
+    "nonwiki": {
+      "loss": 2.0294,
+      "ppl": 7.609,
+      "n_samples": 8010
+    },
+    "wiki": {
+      "loss": 2.4856,
+      "ppl": 12.008,
+      "n_samples": 7006
+    },
+    "full": {
+      "loss": 2.2402,
+      "ppl": 9.395,
+      "n_samples": 15016
+    }
+  },
+  "factonly": {
+    "nonwiki": {
+      "loss": 2.9237,
+      "ppl": 18.611,
+      "n_samples": 8010
+    },
+    "wiki": {
+      "loss": 1.6584,
+      "ppl": 5.251,
+      "n_samples": 7006
+    },
+    "full": {
+      "loss": 2.3305,
+      "ppl": 10.283,
+      "n_samples": 15016
+    }
+  },
+  "mix_ref_1027643": {
+    "nonwiki": {
+      "loss": 1.9676,
+      "ppl": 7.153,
+      "n_samples": 8010
+    },
+    "wiki": {
+      "loss": 1.5873,
+      "ppl": 4.89,
+      "n_samples": 7006
+    },
+    "full": {
+      "loss": 1.7875,
+      "ppl": 5.975,
+      "n_samples": 15016
+    }
+  }
+}

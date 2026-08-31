@@ -1,0 +1,51 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       16      # stage 2: small r for ~3.2w qa_ds (1/30 of baseline)
+  lora_alpha:   32      # = 2 * lora_r
+  lora_dropout: 0.1     # stronger dropout vs baseline (0.05) due to smaller data
+
+
+training:
+  lm_lr:        5.0e-5
+  adapter_lr:   1.0e-4
+  weight_decay: 0.01
+  warmup_ratio: 0.05
+  grad_clip:    1.0
+  n_epochs:     5
+  eval_steps:   200
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       192   # logits(192×208×151k vocab) bf16+fp32 ~37GB; total≈62GB on 80G A100
+      grad_accum_steps: 2     # effective global batch = 192 × 4 × 2 = 1536
+    adapter:
+      n_tokens: 64            # upsamples last-token vector to match 64-token context window
+    dataset:
+      source:        "wikipedia"
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.1
+      recon_ratio:   0.8      # 80% of train → stage 1 recon; 20% held out as qa for stage 2
+      max_label_len: 128      # caps seq_len at 64+15+128+1 = 208 tokens
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b"
+      resume:     false
+    finetune:
+      # base dir; script creates scheme_a/ and scheme_b/ subdirs
+      output_dir:          "checkpoints/oracle_ft_qwen3_4b_v1"
+      # LoRA typically needs higher lr than full finetune (few params, need faster convergence)
+      lm_lr:               1.0e-4   # LoRA lr range: 1e-4~3e-4 (large data), 5e-5~1e-4 (18w)
+      adapter_lr:          3.0e-4   # scheme b only; lowered from 1e-3 to reduce overfitting
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      min_lr_ratio:        0.033    # cosine floor: lm_lr×0.033 ≈ 3.3e-6; adapter_lr×0.033 ≈ 1e-5
+      grad_clip:           1.0
+      n_epochs:            4
+      eval_steps:          200
+      # 40GB MIG scheme a: ~8GB model + <1GB LoRA optimizer + ~1GB activations(GC) → ~10GB total
+      # 40GB MIG scheme b: adapter (860M) unfrozen adds ~7GB grad+optimizer → use batch=32
+      # batch=32 per rank → effective global = 32×4×2 = 256 (4 GPUs, single node)
+      batch_size:          32
+      grad_accum_steps:    2
+      lora_target_modules: ["q_proj", "v_proj"]

@@ -1,0 +1,65 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       64                    # AO-style stage-2 LoRA
+  lora_alpha:   128
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# v1-2 stage-2 ft on 2M, lm_lr=1e-4 variant:
+#   原版 v1-2_2M.yaml 用 lm_lr=5e-4，但前序实验 (ao_stage2_qa_ft job 1002432)
+#   显示 best eval 出现在 lr≈3.85e-4 (warmup 中段), 越过 4e-4 后 eval 单调上升 →
+#   5e-4 已经过冲。本配置降至 1e-4，叠加 LoRA scaling (alpha/r=2) 等效步长 ≈ 2e-4，
+#   落在常规 LoRA 微调甜点区间。其他超参与 v1-2_2M 完全一致以便对照。
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5       # stage-1 placeholder; ft 段 finetune.lm_lr 覆盖
+  adapter_lr:           3.0e-4       # stage-1 placeholder
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             16
+  eval_steps:           200
+  early_stop_patience:  6
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       128
+      grad_accum_steps: 3
+    adapter:                          # match v1-2 q-former arch
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      source:        ["wikipedia", "scientific"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.2
+      recon_ratio:   0.8
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b_v1-2/ep16"
+      resume:     true
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen3_4b_v1-2_2M_lr1e-4"   # NEW dir (不与 5e-4 job 冲突)
+      lm_lr:               1.0e-4              # 5e-4 → 1e-4 (避开 job 1002432 已证伪的过冲)
+      adapter_lr:          5.0e-5              # protect aligned q-former adapter (与 5e-4 版一致)
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      grad_clip:           1.0
+      n_epochs:            10
+      eval_steps:          200
+      early_stop_patience: 6
+      early_stop_min_delta: 1.0e-4
+      batch_size:          128
+      grad_accum_steps:    3                   # 4 ranks × 128 × 3 = eff batch 1536
+      lora_target_modules: "all-linear"
+      train_subsample_ratio: 0.617             # 3.24M → 2M (per-source stratified, seed=42)

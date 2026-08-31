@@ -1,0 +1,70 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       16
+  lora_alpha:   32
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# v1-2 lr-probe: same arch as v1-2 (2-layer Q-Former + FFN×4), lower
+# adapter_lr + longer patience.
+#   Original v1-2 crashed at step 200 (NCCL timeout, job 963196) so we never
+#   got a real eval. Rerun with the same softened recipe as v1-3 lr-probe
+#   so cross-attn family (v1-2, v1-3, v1-4) can be fairly compared.
+#   Pipeline:
+#     activation (4096) → Linear → 8 context tokens (each 2560-d)
+#     64 learnable queries → 2 × (CrossAttn + FFN×4) → LayerNorm → 64 soft tokens
+#   Param budget: ~241M  (vs v1-3 399M, v1-4 483M)
+#   Changes vs v1-2:
+#     adapter_lr:          1e-3 → 3e-4
+#     early_stop_patience: 3 → 6
+#     output_dir renamed to v1-2 convention (was v4b).
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           3.0e-4       # CHANGED: 1e-3 → 3e-4
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             4
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       128
+      grad_accum_steps: 3             # effective global: 128 × 4 × 3 = 1536
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      source:        ["wikipedia", "scientific"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.2
+      recon_ratio:   0.8
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b_v1-2/lr3e-4"
+      resume:     true
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen3_4b_v1-2_lr3e-4"
+      lm_lr:               1.0e-4
+      adapter_lr:          3.0e-4
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      grad_clip:           1.0
+      n_epochs:            4
+      eval_steps:          200
+      batch_size:          32
+      grad_accum_steps:    2
+      lora_target_modules: ["q_proj", "v_proj"]

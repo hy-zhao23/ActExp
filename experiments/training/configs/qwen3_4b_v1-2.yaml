@@ -1,0 +1,69 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       16
+  lora_alpha:   32
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# v4b: deeper CROSS-ATTENTION adapter (Q-Former style with stacked blocks).
+#   Response to v4a's underperformance (single-layer cross-attn, no FFN → eval 1.547).
+#   Pipeline:
+#     activation (4096) → Linear → 8 context tokens (each 2560-d)
+#     64 learnable queries → 2 × (CrossAttn + FFN 4×) → LayerNorm → 64 soft tokens
+#   Param breakdown:
+#     context_proj         4096 × 8·2560           = 83.9M
+#     per layer: CrossAttn (26.2M) + FFN ×4 (52.4M) = 78.6M × 2 = 157.2M
+#     queries + LNs                                 ~0.2M
+#     TOTAL                                         ≈ 241M   (vs v4a 110M, v4-0 860M)
+#   Motivation: standard Q-Former stacks ≥2 blocks with FFN. v4a's single
+#   layer without FFN was simply too shallow.
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           1.0e-3
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             4
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       128       # 80G A100, 4×1 DDP; cross-attn + FFN is heavier than v4a
+      grad_accum_steps: 3         # effective global: 128 × 4 × 3 = 1536 (match v4-0)
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2               # NEW: 2 stacked transformer blocks
+      ffn_mult:   4               # NEW: FFN hidden = 4 × lm_dim = 10240
+    dataset:
+      source:        ["wikipedia", "scientific"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.2
+      recon_ratio:   0.8
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b_v4b"
+      resume:     true
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen3_4b_v4b"
+      lm_lr:               1.0e-4
+      adapter_lr:          3.0e-4
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      grad_clip:           1.0
+      n_epochs:            4
+      eval_steps:          200
+      batch_size:          32
+      grad_accum_steps:    2
+      lora_target_modules: ["q_proj", "v_proj"]

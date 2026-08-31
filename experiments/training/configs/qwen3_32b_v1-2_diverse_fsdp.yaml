@@ -1,0 +1,68 @@
+model:
+  name:         "Qwen/Qwen3-32B"
+  lora_r:       16
+  lora_alpha:   32
+  lora_dropout: 0.1
+  use_fsdp:     true            # FSDP FULL_SHARD across local 4 GPUs (1 node)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# FSDP sanity check — same setup as qwen3_32b_v1-2_diverse.yaml, but with
+# FSDP wrap instead of single-rank-per-node DDP. Output dir renamed so we
+# don't clobber the existing (already-completed) ckpt.
+#
+# Purpose: validate FSDP code path on a model size that already trains
+# successfully (32B). Before risking 72B + FSDP, confirm loss curve here
+# matches the non-FSDP run.
+#
+# Topology: 1 node × 4× A100 80G. 32B bf16 = 64 GB; FULL_SHARD → 16 GB/GPU.
+# Plus activations + embedding (replicated ~1 GB) + adapter (DDP, ~2 GB).
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           1.0e-3
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             4
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       16
+      grad_accum_steps: 24
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      source:        null
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.05
+      recon_ratio:   1.0
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_32b_v1-2_diverse_fsdp"
+      resume:     true
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen3_32b_v1-2_diverse_fsdp"
+      lm_lr:               1.0e-4
+      adapter_lr:          3.0e-4
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      grad_clip:           1.0
+      n_epochs:            4
+      eval_steps:          200
+      batch_size:          4
+      grad_accum_steps:    16
+      lora_target_modules: ["q_proj", "v_proj"]

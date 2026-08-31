@@ -1,0 +1,64 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.05
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# v0-8: relax both knobs toward v0-4 — widen bottleneck + restore n_tokens.
+#   bottleneck_dim: 3072  (was 2048 in v0-5, 4096 in v0-7)
+#   n_tokens:       64    (same as v0-4/v0-6; was 32 in v0-5/v0-7)
+#   Adapter params: ~540M  (v0-4: 860M, −37%; v0-5: 199M, +171%)
+#   Motivation: if both v0-6 (only n_tokens restored) and v0-7 (only
+#   bottleneck widened) still fall short of v0-4, v0-8 approaches v0-4's
+#   capacity (63%) while keeping the bottleneck structure. Answers "can the
+#   bottleneck MLP beat v0-4 at near-equal capacity?"
+#   Output layer: 3072 × 163,840 = 503M (vs v0-4's 839M — saves 336M).
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           1.0e-3
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             4
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       192        # v0-4 ran 860M at batch=192 on 40G MIG; v0-8's 540M on 80G A100 should fit comfortably
+      grad_accum_steps: 2          # effective global batch: 192 × 4 × 2 = 1536 (match v0-6/v0-7/v0-4)
+    adapter:
+      type:           "mlp"
+      n_tokens:       64
+      dropout:        0.1
+      n_hidden:       1
+      bottleneck_dim: 3072
+    dataset:
+      source:        ["wikipedia", "scientific"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.2
+      recon_ratio:   0.8
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b_v0-8"
+      resume:     true
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen3_4b_v0-8"
+      lm_lr:               1.0e-5
+      adapter_lr:          1.0e-4
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      grad_clip:           1.0
+      n_epochs:            4
+      eval_steps:          200
+      batch_size:          32
+      grad_accum_steps:    2
+      lora_target_modules: "all-linear"

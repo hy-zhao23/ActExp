@@ -1,0 +1,92 @@
+model:
+  name:         "Qwen/Qwen3-32B"
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.1
+  # Both stages use FSDP FULL_SHARD across ranks. Multiple attempts at
+  # model_parallel (HF device_map="auto" + DDP device_ids=None) all hung in
+  # PyTorch DDP's per-device sub-comm init (NCCL key='1' timeout: 1038443,
+  # 1040955, 1040962, 1041002, 1041036). FSDP avoids that path entirely.
+  use_fsdp:           true
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# v2 retrain of Qwen3-32B with hp aligned to 4B v1-2 main.
+# Old run (1025533/1026762) used n_epochs=4 + adapter_lr=1e-3 inconsistent
+# with 4B main row, though numbers (2.59/1.68) happened to land reasonably.
+# Old ckpt preserved at *_v1-2_diverse/.
+# Uses FSDP FULL_SHARD on single node × 4× A100 80G (same topology as
+# qwen3_32b_v1-2_diverse_fsdp.yaml which already validated FSDP path).
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           3.0e-4
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             16
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 0.0
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       128
+      grad_accum_steps: 3
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      source: ["ag_news", "ag_news_extra",
+               "dair_emotion", "dair_emotion_extra",
+               "latentqa_control",
+               "lmsys_user", "lmsys_user_extra",
+               "md_gender",
+               "ner",
+               "scientific",
+               "sst2",
+               "tweeteval_emotion",
+               "tweeteval_sentiment", "tweeteval_sentiment_extra",
+               "wikipedia_concept", "wikipedia_event", "wikipedia_generic",
+               "wikipedia_organization", "wikipedia_person",
+               "wikipedia_place", "wikipedia_work"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.05
+      recon_ratio:   0.8
+      max_label_len: 128
+      subdir:        "finetune_diversified"
+      reps_subdir:   "finetune_diversified"
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_32b_v1-2_diverse_v2"
+      resume:     true
+
+    finetune:
+      output_dir:           "checkpoints/oracle_ft_qwen3_32b_v1-2_diverse_v2"
+      lm_lr:                1.0e-4
+      adapter_lr:           5.0e-5
+      weight_decay:         0.01
+      warmup_ratio:         0.1
+      grad_clip:            1.0
+      n_epochs:             10
+      eval_steps:           200
+      early_stop_patience:  5
+      early_stop_min_delta: 0.0
+      # 32B ft uses FSDP FULL_SHARD on 4 nodes × 1× A100 80GiB = 4 ranks.
+      # micro=16 OOM'd (1041105): adapter 797M Adam state is DDP-replicated
+      # → ~12 GiB/rank; plus FSDP all-gather peak on Qwen3 64-layer transformer
+      # left ~250 MiB short. Shrink micro to 4; eff_global = 4 × 4 × 96 = 1536.
+      batch_size:           4
+      grad_accum_steps:     96
+      lora_target_modules:  "all-linear"
+      raw_subdir:           "finetune_diversified"
+      qa_subdir:            "finetune_qa_diversified"
+      reps_subdir:          "finetune_diversified"
+      train_subsample_ratio: null

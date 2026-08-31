@@ -1,0 +1,5 @@
+tag	ft_ckpt	stage1_ckpt	config	decoder_b	best_val
+ours_qwen3_32b	oracle_ft_qwen3_32b_v1-2_diverse/final	oracle_act_qwen3_32b_v1-2_diverse/final	qwen3_32b_v1-2_diverse.yaml	32	1.6801@s14600
+ours_qwen3_14b	oracle_ft_qwen3_14b_v1-2_diverse_v2/final	oracle_act_qwen3_14b_v1-2_diverse_v2/final	qwen3_14b_v1-2_diverse_v2.yaml	14	1.5050@s2400
+ours_self_gemma3_12b	data_scale/oracle_ft_v1-2_diverse_gemma3_12b_self_fullqa/final	data_scale/oracle_act_v1-2_diverse_gemma3_12b_self/final	data_scale/v1-2_diverse_gemma3_12b_self.yaml	12	1.6004@s3000
+ours_qwen3_32b_v2	oracle_ft_qwen3_32b_v1-2_diverse_v2/final	oracle_act_qwen3_32b_v1-2_diverse_v2/final	qwen3_32b_v1-2_diverse_v2.yaml	32	TBD@TBD

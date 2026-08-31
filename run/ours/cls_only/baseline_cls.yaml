@@ -1,0 +1,45 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       8
+  lora_alpha:   16
+  lora_dropout: 0.05
+
+training:
+  lm_lr:        5.0e-5
+  adapter_lr:   1.0e-4
+  weight_decay: 0.01
+  warmup_ratio: 0.05
+  grad_clip:    1.0
+  n_epochs:     5
+  eval_steps:   200
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       192
+      grad_accum_steps: 2
+    adapter:
+      n_tokens: 64
+    dataset:
+      source:        "wikipedia"
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.1
+      recon_ratio:   0.8
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b"
+      resume:     false
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_baseline_cls"   # separate from main
+      lm_lr:               1.0e-5
+      adapter_lr:          1.0e-5
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      min_lr_ratio:        0.033
+      grad_clip:           1.0
+      n_epochs:            2
+      eval_steps:          200
+      batch_size:          64
+      grad_accum_steps:    1
+      lora_target_modules: "all-linear"

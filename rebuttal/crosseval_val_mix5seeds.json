@@ -1,0 +1,87 @@
+{
+  "mix_s42": {
+    "nonwiki": {
+      "loss": 2.0249,
+      "ppl": 7.575,
+      "n_samples": 8010
+    },
+    "wiki": {
+      "loss": 1.6413,
+      "ppl": 5.162,
+      "n_samples": 7006
+    },
+    "full": {
+      "loss": 1.843,
+      "ppl": 6.316,
+      "n_samples": 15016
+    }
+  },
+  "mix_s43": {
+    "nonwiki": {
+      "loss": 2.0255,
+      "ppl": 7.58,
+      "n_samples": 8010
+    },
+    "wiki": {
+      "loss": 1.6372,
+      "ppl": 5.141,
+      "n_samples": 7006
+    },
+    "full": {
+      "loss": 1.8414,
+      "ppl": 6.306,
+      "n_samples": 15016
+    }
+  },
+  "mix_s44": {
+    "nonwiki": {
+      "loss": 2.0277,
+      "ppl": 7.597,
+      "n_samples": 8010
+    },
+    "wiki": {
+      "loss": 1.6395,
+      "ppl": 5.153,
+      "n_samples": 7006
+    },
+    "full": {
+      "loss": 1.8437,
+      "ppl": 6.32,
+      "n_samples": 15016
+    }
+  },
+  "mix_s45": {
+    "nonwiki": {
+      "loss": 2.0268,
+      "ppl": 7.59,
+      "n_samples": 8010
+    },
+    "wiki": {
+      "loss": 1.6414,
+      "ppl": 5.162,
+      "n_samples": 7006
+    },
+    "full": {
+      "loss": 1.8443,
+      "ppl": 6.323,
+      "n_samples": 15016
+    }
+  },
+  "mix_s46": {
+    "nonwiki": {
+      "loss": 2.0239,
+      "ppl": 7.568,
+      "n_samples": 8010
+    },
+    "wiki": {
+      "loss": 1.6401,
+      "ppl": 5.155,
+      "n_samples": 7006
+    },
+    "full": {
+      "loss": 1.8418,
+      "ppl": 6.308,
+      "n_samples": 15016
+    }
+  }
+}

@@ -1,0 +1,95 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# data-scale ablation 3/3: v1-2 setting on diverse recon + FULL ~1.13M DIVERSE QA
+#
+# 实验组关系:
+#   exp 1: 500k OLD recon       + 500k OLD QA            (running, job 1023830)
+#   exp 2: ~470k DIVERSE recon  + ~500k DIVERSE QA       (v1-2_500k_diverse.yaml)
+#   exp 3: ~470k DIVERSE recon  + 1.127M (full) DIVERSE QA  ← 本 config
+#
+# Stage 1 ckpt 共享 exp 2:
+#   实际 finetune 直接用 checkpoints/data_scale/oracle_act_v1-2_500k_diverse/final.
+#   所以没独立的 03_pretrain_*_fullqa.sh, 不需要再跑 stage-1.
+#
+# 与 exp 2 唯一变量: stage-2 QA 量 (~500k 子采 → 1.13M 全量).
+# train_subsample_ratio: null = 用全部 diverse QA train slots (1,126,923 个).
+#
+# Step budget (eff batch=1536):
+#   Stage 2: 1.13M / 1536 ≈ 734 steps/ep × 10 ep ≈ 7,340 steps  (~21h 实际)
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           3.0e-4
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             16
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 0.0
+
+tasks:
+  activation:
+    # NOTE: stage-1 块仅占位; finetune 流程不会重训 stage 1.
+    # 实际 stage-1 ckpt 复用 v1-2_500k_diverse.yaml 训出的 final/.
+    task_training:
+      batch_size:       128
+      grad_accum_steps: 3
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      source: ["ag_news", "ag_news_extra",
+               "dair_emotion", "dair_emotion_extra",
+               "latentqa_control",
+               "lmsys_user", "lmsys_user_extra",
+               "md_gender",
+               "ner",
+               "scientific",
+               "sst2",
+               "tweeteval_emotion",
+               "tweeteval_sentiment", "tweeteval_sentiment_extra",
+               "wikipedia_concept", "wikipedia_event", "wikipedia_generic",
+               "wikipedia_organization", "wikipedia_person",
+               "wikipedia_place", "wikipedia_work"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.05
+      recon_ratio:   0.8
+      max_label_len: 128
+      subdir:        "finetune_diversified"
+      reps_subdir:   "finetune_diversified"
+    io:
+      output_dir: "checkpoints/data_scale/oracle_act_v1-2_500k_diverse"   # 共享 stage-1 输出
+      resume:     true
+
+    finetune:
+      output_dir:           "checkpoints/data_scale/oracle_ft_v1-2_500k_diverse_fullqa"
+      lm_lr:                1.0e-4
+      adapter_lr:           5.0e-5
+      weight_decay:         0.01
+      warmup_ratio:         0.1
+      grad_clip:            1.0
+      n_epochs:             10
+      eval_steps:           200
+      early_stop_patience:  5
+      early_stop_min_delta: 0.0
+      batch_size:           128
+      grad_accum_steps:     3
+      lora_target_modules:  "all-linear"
+      raw_subdir:           "finetune_diversified"
+      qa_subdir:            "finetune_qa_diversified"
+      reps_subdir:          "finetune_diversified"
+      train_subsample_ratio: null     # null = 用全部 diverse QA train slots (~1.13M)

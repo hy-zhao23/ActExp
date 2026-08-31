@@ -1,0 +1,3 @@
+tag	model	reps_subdir	donor_layer	inject_layer
+patchscope_direct_qwen3_4b	Qwen/Qwen3-4B	finetune_diversified_qwen3_l27	27	1
+patchscope_direct_llama31_8b	meta-llama/Llama-3.1-8B-Instruct	finetune_diversified	27	1

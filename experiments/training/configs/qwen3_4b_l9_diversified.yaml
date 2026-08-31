@@ -1,0 +1,96 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       16
+  lora_alpha:   32
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# diversified-stage1: alignment on the diversified mix (21 sources, ~470k).
+#   Activation: Qwen3-4B layer 27 last-token (hidden_dim=2560, self-decoding
+#               variant — NOT cross-model Llama→Qwen3 like v1-2).
+#   Adapter: Q-Former style cross-attn (matches v1-2 / v4b architecture).
+#
+#   Sources:
+#     17 finetune_diversified Stage 2 sources (5 size buckets)
+#     + 4 *_extra Stage 1 supplements (non-overlapping with Stage 2 raw text)
+#
+#   Data ≈ 1/4 of v1-2 (470k vs 2M); n_epochs scaled to keep similar total
+#   compute. With cosine + early stop, expect convergence in ~12-14 h.
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           1.0e-3
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             16
+  eval_steps:           200
+  early_stop_patience:  6
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       128
+      grad_accum_steps: 3                    # eff global: 128 × 4 × 3 = 1536
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      source:
+        # 17 finetune Stage 2 sources (also seen by stage 2 QA training)
+        - ag_news
+        - dair_emotion
+        - latentqa_control
+        - lmsys_user
+        - md_gender
+        - ner
+        - scientific
+        - sst2
+        - tweeteval_emotion
+        - tweeteval_sentiment
+        - wikipedia_concept
+        - wikipedia_event
+        - wikipedia_generic
+        - wikipedia_organization
+        - wikipedia_person
+        - wikipedia_place
+        - wikipedia_work
+        # 4 stage-1-only supplements (no QA, no overlap with Stage 2 text)
+        - ag_news_extra
+        - dair_emotion_extra
+        - lmsys_user_extra
+        - tweeteval_sentiment_extra
+      subdir:        "finetune_diversified"
+      reps_subdir:   "finetune_diversified_qwen3_l9"
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.05            # 470k × 5% ≈ 23k eval; rest train
+      recon_ratio:   1.0             # all train rows used for stage-1 recon
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b_l9_diversified"
+      resume:     true
+
+    finetune:
+      output_dir:           "checkpoints/oracle_ft_qwen3_4b_l9_diversified"
+      reps_subdir:          "finetune_diversified_qwen3_l9"
+      lm_lr:                1.0e-4
+      adapter_lr:           3.0e-4
+      weight_decay:         0.01
+      warmup_ratio:         0.1
+      grad_clip:            1.0
+      n_epochs:             8
+      eval_steps:           200
+      early_stop_patience:  6
+      early_stop_min_delta: 1.0e-4
+      batch_size:           128
+      grad_accum_steps:     3
+      lora_target_modules:  "all-linear"

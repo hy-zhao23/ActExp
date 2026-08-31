@@ -1,0 +1,101 @@
+model:
+  name:         "Qwen/Qwen3-8B"
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# v3 — fixes 8B v2 stage-1 premature early-stop.
+#
+# v2 stage-1 (act) hit patience=3 at step 1400 (best @ s800, eval_loss=2.726).
+# The eval curve bobbed early (s400 went UP from s200, s1000-1200 noisy), so
+# 3 consecutive non-improvements ended training before the adapter converged.
+# 4B/14B with same patience trained smoothly past s2000 and reached lower
+# eval losses (4B: 2.69 @ s3000; 14B: 2.41 @ s1600).
+#
+# Downstream effect (this is why v3 exists):
+#   v2 stage-2 ft val_loss = 1.6263 (better than 4B's 1.6388, so it LOOKED
+#   fine) but autoregressive eval on wikipedia/fact tasks scored WORSE than
+#   0.6B (0.218 vs 0.225 token_f1) — LoRA over-fitted to teacher-forced
+#   prediction while the underlying activation→soft-token mapping (frozen
+#   from undertrained stage-1 adapter) couldn't recall facts at gen time.
+#
+# v3 change: `early_stop_patience: 3 → 10` (and new output_dir suffix _v3
+# so v2 artifacts can be kept for comparison / archived).
+# v2 artifacts moved to: checkpoints/archive/oracle_{act,ft}_qwen3_8b_v1-2_diverse_v2/
+#                        out/eval/archive/ours_qwen3_8b_v2/
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           3.0e-4
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             16
+  eval_steps:           200
+  # v2 stage 1 stopped at s1400 because eval loss bobbed up 3× in a row after
+  # s800 (best=2.7257). 4B with same hp kept improving past s2000 to 2.69 →
+  # adapter was undertrained → stage 2 ft inherited a broken activation→soft
+  # mapping → eval fact group worse than 0.6B even with lower val loss.
+  # Bump patience so noisy bumps don't kill training prematurely.
+  early_stop_patience:  10
+  early_stop_min_delta: 0.0
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       128
+      grad_accum_steps: 3
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      source: ["ag_news", "ag_news_extra",
+               "dair_emotion", "dair_emotion_extra",
+               "latentqa_control",
+               "lmsys_user", "lmsys_user_extra",
+               "md_gender",
+               "ner",
+               "scientific",
+               "sst2",
+               "tweeteval_emotion",
+               "tweeteval_sentiment", "tweeteval_sentiment_extra",
+               "wikipedia_concept", "wikipedia_event", "wikipedia_generic",
+               "wikipedia_organization", "wikipedia_person",
+               "wikipedia_place", "wikipedia_work"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.05
+      recon_ratio:   0.8
+      max_label_len: 128
+      subdir:        "finetune_diversified"
+      reps_subdir:   "finetune_diversified"
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_8b_v1-2_diverse_v3"
+      resume:     true
+
+    finetune:
+      output_dir:           "checkpoints/oracle_ft_qwen3_8b_v1-2_diverse_v3"
+      lm_lr:                1.0e-4
+      adapter_lr:           5.0e-5
+      weight_decay:         0.01
+      warmup_ratio:         0.1
+      grad_clip:            1.0
+      n_epochs:             10
+      eval_steps:           200
+      early_stop_patience:  5
+      early_stop_min_delta: 0.0
+      batch_size:           128
+      grad_accum_steps:     3
+      lora_target_modules:  "all-linear"
+      raw_subdir:           "finetune_diversified"
+      qa_subdir:            "finetune_qa_diversified"
+      reps_subdir:          "finetune_diversified"
+      train_subsample_ratio: null

@@ -1,0 +1,41 @@
+# Local data and generated outputs
+.cache/
+checkpoints/
+data/
+logs/
+out/
+tmp/
+wandb/
+*.cache_done
+*.err
+*.log
+*.out
+*.pdf
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# External baseline checkouts and generated artifacts
+experiments/baseline/activation_oracles/
+experiments/baseline/latentqa/
+experiments/baseline/ours/
+experiments/baseline/ao_ablation/results/
+experiments/baseline/latentqa_diversified/out/
+**/preprocessed_data/
+
+# Local tooling
+.claude/
+.env
+.venv/
+CLAUDE.md
+run/monitor_state.json
+
+# Generated reports and media
+metric.md
+*.ipynb
+*.png
+**/images/

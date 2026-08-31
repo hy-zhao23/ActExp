@@ -1,0 +1,202 @@
+# =============================================================================
+# oracle — HuggingFace 模型与数据集版本锁定
+#
+# 记录于 2026-07-22。这些 sha 是当时线上的 latest，也是本地缓存实际使用的版本。
+#
+# 为什么必须记：代码里所有 load_dataset() / from_pretrained() 都没有传
+# revision=，默认拉 latest。上游一旦更新，重下的内容就和跑论文时不同，
+# 而 seed 救不回这种差异（seed 只决定从给定数据里抽哪些，不决定数据本身）。
+#
+# 记了就能一直用：HF 保留全部历史版本，只要 sha 在手，
+#   load_dataset("allenai/peS2o", revision="636a503e...")
+#   AutoModel.from_pretrained("Qwen/Qwen3-8B", revision="b968826d...")
+# 永远能取回当初那份 —— 除非上游整个仓库被删除或转为私有。
+#
+# 校验方式：
+#   python -c "
+#   from huggingface_hub import HfApi
+#   print(HfApi().dataset_info('allenai/peS2o').sha)"
+#   与本地缓存对比：ls tmp/huggingface/hub/datasets--allenai--peS2o/snapshots/
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# ⚠️ 已发生漂移 —— 重下务必带 revision
+# -----------------------------------------------------------------------------
+# 本地缓存用的是前者，线上 latest 已是后者。这是 NLI 打分模型，
+# 版本不同会直接改变 entailment 分数，进而影响论文里的指标。
+microsoft/deberta-xlarge-mnli   1a1ab352f77ce04f33d58c19328eaedb5270f58a   # 本地在用
+# microsoft/deberta-xlarge-mnli 5b07a9086c1dbb79981ff7b05b4d1ad83b3af51c   # 线上 latest 2022-06-27，勿用
+
+# -----------------------------------------------------------------------------
+# 数据集（本地缓存 sha 与线上 latest 一致，2026-07-22 核对）
+# -----------------------------------------------------------------------------
+allenai/c4                        1588ec454efa1a09f29cd18ddd04fe05fc8653a2   # 2024-01-09
+allenai/peS2o                     636a503e44a3ca1b58e01fb61eab0825cd574de0   # 2024-10-13
+Anthropic/hh-rlhf                 09be8c5bbc57cb3887f3a9732ad6aa7ec602a1fa   # 2023-05-26
+cardiffnlp/tweet_eval             b3a375baf0f409c77e6bc7aa35102b7b3534f8be   # 2024-01-04
+dair-ai/emotion                   cab853a1dbdf4c42c2b3ef2173804746df8825fe   # 2024-08-08
+databricks/databricks-dolly-15k   bdd27f4d94b9c1f951818a7da7fd7aeea5dbff1a   # 2023-06-30
+EleutherAI/the_pile_deduplicated  fcbfcfde4222cbb1acd1d33bad0be250ee14b1bb   # 2022-12-02
+facebook/md_gender_bias           41aa009fb2c30fdf7da2590bfd77a4260acdce0d   # 2024-01-18
+fancyzhx/ag_news                  eb185aade064a813bc0b7f42de02595523103ca4   # 2024-03-07
+fever                             2a74f2909caf2b8656343aeb8203e50bf84dcb56   # 2024-01-18
+FrancophonIA/WiLI-2018            557bb97883695c63e142a77f9feaeab2535ca799   # 2025-03-30
+lmsys/lmsys-chat-1m               200748d9d3cddcc9d782887541057aca0b18c5da   # 2024-07-27  gated=auto
+monology/pile-uncopyrighted       3be90335b66f24456a5d6659d9c8d208c0357119   # 2023-08-31
+OpenAssistant/oasst1              fdf72ae0827c1cda404aff25b6603abec9e3399b   # 2023-05-02
+stanfordnlp/snli                  cdb5c3d5eed6ead6e5a341c8e56e669bb666725b   # 2024-03-06
+stanfordnlp/sst2                  8d51e7e4887a4caaa95b3fbebbf53c0490b58bbb   # 2024-01-04
+tatsu-lab/alpaca                  dce01c9b08f87459cf36a430d809084718273017   # 2023-05-22
+wikimedia/wikipedia               b04c8d1ceb2f5cd4588862100d08de323dccfbaa   # 2024-01-09
+
+# 本地已缓存但当前代码未引用（早期探索遗留，一并记录以备查）
+arxiv_dataset                     c70944cb158dcdab8a5403b1fa20f28119f701a6   # 2024-01-18
+ccdv/arxiv-summarization          240aaf1a969b3f8cd0ade6986bfad0cd730ee288   # 2024-08-08
+ccdv/pubmed-summarization         6b30a2cae59b11ed77cb19959bffccbbd18e1106   # 2024-08-08
+EleutherAI/pile                   148e1d5e8349977c76f673190424a2faf6980a1d   # 2023-05-03
+HuggingFaceFW/fineweb             9bb295ddab0e05d785b879661af7260fed5140fc   # 2025-07-11
+ncbi/pubmed                       8263182bec2a83be3f73706759adada1e1bfe3c6   # 2024-01-26
+togethercomputer/RedPajama-Data-1T 398f92572e94f4793e41c22ab7ea2a788d9e7de4  # 2024-06-17
+
+# -----------------------------------------------------------------------------
+# 模型（gated 的需要 HF_API_KEY 且账号已获批）
+# -----------------------------------------------------------------------------
+# Qwen3 系列 —— 主线 donor
+Qwen/Qwen3-0.6B                   c1899de289a04d12100db370d81485cdf75e47ca   # 2025-07-26
+Qwen/Qwen3-4B                     1cfa9a7208912126459214e8b04321603b3df60c   # 2025-07-26
+Qwen/Qwen3-4B-Base                906bfd4b4dc7f14ee4320094d8b41684abff8539   # 2025-07-26  rebuttal R1 用
+Qwen/Qwen3-4B-Instruct-2507       cdbee75f17c01a7cc42f958dc650907174af0554   # 2025-09-17
+Qwen/Qwen3-8B                     b968826d9c46dd6066d109eabc6255188de91218   # 2025-07-26  主线
+Qwen/Qwen3-14B                    40c069824f4251a91eefaf281ebe4c544efd3e18   # 2025-07-26
+Qwen/Qwen3-14B-AWQ                31c69efc29464b6bb0aee1398b5a7b50a99340c3   # 2025-05-21
+Qwen/Qwen3-32B                    9216db5781bf21249d130ec9da846c4624c16137   # 2025-07-26
+Qwen/Qwen2.5-14B-Instruct         cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8   # 2024-09-25
+Qwen/Qwen2.5-72B-Instruct         495f39366efef23836d0cfae4fbe635880d2be31   # 2025-01-12
+
+# Llama 系列（全部 gated=manual）
+meta-llama/Llama-3.1-8B-Instruct  0e9e39f249a16976918f6564b8830bc894c89659   # 2024-09-25
+meta-llama/Llama-3.3-70B-Instruct 6f6073b423013f6a7d4d9f39144961bfbfbc386b   # 2024-12-21
+meta-llama/Meta-Llama-3-8B-Instruct  8afb486c1db24fe5011ec46dfbe5b5dccdb575c2  # 2025-06-18
+meta-llama/Meta-Llama-3-70B-Instruct 50fd307e57011801c7833c87efa1984ddf2db42f  # 2025-06-18
+
+# Gemma 系列（全部 gated=manual）
+google/gemma-2-9b-it              11c9b309abf73637e4b6f9a3fa1e92e615547819   # 2024-08-27
+google/gemma-2-27b-it             aaf20e6b9f4c0fcf043f6fb2a2068419086d77b0   # 2024-08-27
+google/gemma-3-4b-it              093f9f388b31de276ce2de164bdc2081324b9767   # 2025-03-21
+google/gemma-3-12b-it             96b6f1eccf38110c56df3a15bffe176da04bfd80   # 2025-03-21
+google/gemma-3-27b-it             005ad3404e59d6023443cb575daa05336842228a   # 2025-03-21
+
+# 其他
+01-ai/Yi-1.5-34B-Chat             fa4ffba162f20948bf77c2a30eca952bf0812b7f   # 2024-08-27
+mistralai/Ministral-8B-Instruct-2410      2f494a194c5b980dfb9772cb92d26cbb671fce5a   # 2025-07-31
+mistralai/Mistral-Small-24B-Instruct-2501 9527884be6e5616bdd54de542f9ae13384489724   # 2025-07-28
+zai-org/GLM-4-32B-0414            077b5c2f5c43bd3239fd605a0600229e8facbd4a   # 2025-05-01
+
+# =============================================================================
+# 重建 data/representations (31.8G，已于 2026-07-22 删除 .npy)
+# =============================================================================
+# 只删了 1238 个 .npy，**13 个 metadata.json 全部保留** —— 它们记录了每个配置的
+# model / layer / hidden_dim / max_len / batch_size / world_size / 每个源的样本数，
+# 是重建的完整说明书。目录结构原样保留。
+#
+# 重建命令：
+#   python experiments/data_prep/cache_representations.py --data-dir data/raw
+#
+# 确定性：cache_representations.py:113 用 lines[rank::world_size] 分片，无随机性；
+#         world_size=4 既写在 metadata.json 里也写在文件名里（*_rank2_of_4.npy）。
+#         只读本地 data/raw/*.jsonl，不碰任何 HF 数据集。
+#
+# ⚠️ 需要先重下这 6 个模型（TIER1 清理时已删，务必带 --revision）：
+#   Qwen/Qwen3-4B                     1cfa9a7208912126459214e8b04321603b3df60c   6 个配置(l3/l9/l15/l21/l27/l33)
+#   meta-llama/Llama-3.1-8B-Instruct  0e9e39f249a16976918f6564b8830bc894c89659   3 个配置  gated
+#   Qwen/Qwen3-4B-Base                906bfd4b4dc7f14ee4320094d8b41684abff8539   1 个配置
+#   google/gemma-3-12b-it             96b6f1eccf38110c56df3a15bffe176da04bfd80   1 个配置  gated
+#   google/gemma-3-4b-it              093f9f388b31de276ce2de164bdc2081324b9767   1 个配置  gated
+#   01-ai/Yi-1.5-34B-Chat             fa4ffba162f20948bf77c2a30eca952bf0812b7f   1 个配置
+#   合计约 130G 下载量。
+
+# =============================================================================
+# 重建 experiments/baseline/activation_oracles/sft_training_data (62G)
+# =============================================================================
+# 这是 Activation-Oracles baseline 的预处理 SFT 训练数据，482 个 .pt 文件。
+# 不是 checkpoint，可以重建，但**必须同时 pin 数据集 revision，否则拿不回同一份**。
+#
+# 大小分布（前两个就占 46G）：
+#   past_lens_model_Qwen3-4B_n_100000_..._5b8b635bbdcb.pt   35.2G
+#   latentqa_model_Qwen3-4B_n_100000_..._e92f7259a7a3.pt    10.7G
+#   其余 480 个 classification_* / past_lens_*              ~16G
+#
+# 确定性来源（已核对）：
+#   nl_probes/configs/sft_config.py:49            seed: int = 42
+#   nl_probes/dataset_classes/act_dataset_manager.py:29   seed: int = 42
+#   nl_probes/dataset_classes/past_lens_dataset.py:177    random.seed(dataset_config.seed)
+#   nl_probes/dataset_classes/past_lens_dataset.py:178    torch.manual_seed(dataset_config.seed)
+#   → seed 只管循环内的打包/分支决策。
+#
+# 数据顺序来源（关键）：
+#   nl_probes/dataset_classes/past_lens_dataset.py:123-124
+#       pretrain_ds = iter(load_dataset("HuggingFaceFW/fineweb", split=split, streaming=True))
+#       chat_ds     = iter(load_dataset("lmsys/lmsys-chat-1m",  split=split, streaming=True))
+#   顺序读取、**没有 .shuffle()**，所以给定同一 revision 就是确定的。
+#   但代码里没有传 revision=，默认拉 latest。
+#   fineweb 是持续更新的大数据集，漂移概率很高。
+#
+# ⚠️ 重建步骤：
+#   1. 修改 past_lens_dataset.py:123-124，把 revision 传进去：
+#        load_dataset("HuggingFaceFW/fineweb", split=split, streaming=True,
+#                     revision="9bb295ddab0e05d785b879661af7260fed5140fc")
+#        load_dataset("lmsys/lmsys-chat-1m", split=split, streaming=True,
+#                     revision="200748d9d3cddcc9d782887541057aca0b18c5da")
+#      （lmsys-chat-1m 是 gated=auto，需要 HF token）
+#   2. 确认 seed 仍为 42（sft_config.py / act_dataset_manager.py）
+#   3. 删除 sft_training_data/*.cache_done 标记，否则会跳过重新生成
+#   4. 跑 AO repo 自带的数据生成流程
+#
+# 与本文件其他条目的区别：那些纯下载物只要 pin 了 sha 就一定能还原；
+# 这个还需要改代码把 revision 传进去，属于「可重建但要动手」的一类。
+#
+# 【已于 2026-07-22 删除，62G】
+# revision pin 已写入代码（past_lens_dataset.py 顶部的 DATASET_REVISIONS），
+# 所以重建时不必再改代码，直接跑生成流程即可。
+#
+# 重建代价：只需 Qwen/Qwen3-4B（7.6G，revision 1cfa9a72...）+ 数小时 4B forward。
+# fineweb / lmsys 都是 streaming 读取，不需要完整下载数据集。
+#
+# 注意：即使文件名写着 save_acts_False，每个样本仍存有
+#   steering_vectors: Tensor[6, 2560] bfloat16
+# 即 6 层的激活值本身，所以重建**必须跑 GPU forward**，不是纯 CPU 分词。
+# （18000 样本 × 6 × 2560 × 2 byte ≈ 553MB，加 token 列表约 1.01GB/文件）
+
+# =============================================================================
+# 已知不可复现点 —— pin revision 也解决不了的
+# =============================================================================
+# 1) data/archive/raw/finetune_old 必须保留。
+#    sample_stage1_extras.py:71 把 ag_news_extra(50k) 定义为
+#    「finetune_old/ag_news 中 seed=42 未抽中的补集」，是对某次具体抽样取补，
+#    不是独立的 seeded 抽样。删掉源目录就无法再推导。
+#
+# 2) streaming=True 的数据集（lmsys-chat-1m / c4 / pile-uncopyrighted）
+#    在 ingest 时做过一次 shuffle，那次 shuffle 没有 seed 记录
+#    （见 sample_pretrain_supplement.py:13）。产物只能靠 data/raw/ 留存。
+#
+# 3) 因此 data/raw/（413M）是整条链的根，任何清理都不要动它。
+#    有它在，representation 可以完全重算，且不需要重下任何 HF 数据集
+#    （cache_representations.py:175 默认 --data-dir data/raw）。
+
+# =============================================================================
+# 清理记录 2026-07-22 —— oracle 670G → 280G
+# =============================================================================
+# 已删（均可重建，重建方式见上文各条）：
+#   330G  tmp/huggingface/  8 个模型 + peS2o + wikipedia + arrow/downloads/xet 缓存
+#    32G  data/archive/representations   旧版，已被 data/representations/ 取代
+#    25G  checkpoints/**/optimizer.pt    ×15，Adam 状态，仅续训需要
+#   153M  logs/                           SLURM 日志
+#   359M  tmp/{geometry-of-truth,latentqa,relations,HidingInTheHiddenStates}
+#
+# 明确保留：
+#   154G  checkpoints/            权重全在，只去掉了 optimizer state
+#    93G  experiments/baseline/   含 sft_training_data 62G、latentqa out 28G(checkpoint)
+#    32G  data/representations/   2026-07-20 仍在写
+#   1.8G  data/archive/raw/       含 finetune_old，ag_news_extra 的推导源
+#   413M  data/raw/               整条数据链的根
+#   141M  out/                    eval 结果与图

@@ -1,0 +1,63 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.05
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# v0-6: single-variable ablation on v0-5 — restore n_tokens 32 → 64.
+#   bottleneck_dim: 2048  (same as v0-5)
+#   n_tokens:       64    (was 32 in v0-5; matches v0-4)
+#   Adapter params: ~367M  (v0-5: 199M, +84%; v0-4: 860M)
+#   Motivation: v0-5 changed TWO things vs v0-4 (bottleneck + halved n_tokens).
+#   It regressed to 1.587. Isolate n_tokens: keep bottleneck=2048 but restore
+#   64 soft tokens. If v0-6 ≈ v0-5, n_tokens wasn't the issue. If v0-6 → v0-4,
+#   the halving was costly.
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           1.0e-3
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             4
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       192        # match v0-4 (v0-5 used 256 because adapter was smaller)
+      grad_accum_steps: 2          # effective global batch: 192 × 4 × 2 = 1536 (match v0-4)
+    adapter:
+      type:           "mlp"
+      n_tokens:       64
+      dropout:        0.1
+      n_hidden:       1
+      bottleneck_dim: 2048
+    dataset:
+      source:        ["wikipedia", "scientific"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.2
+      recon_ratio:   0.8
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b_v0-6"
+      resume:     true
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen3_4b_v0-6"
+      lm_lr:               1.0e-5
+      adapter_lr:          1.0e-4
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      grad_clip:           1.0
+      n_epochs:            4
+      eval_steps:          200
+      batch_size:          32
+      grad_accum_steps:    2
+      lora_target_modules: "all-linear"

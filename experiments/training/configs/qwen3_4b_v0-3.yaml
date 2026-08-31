@@ -1,0 +1,50 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       16
+  lora_alpha:   32
+  lora_dropout: 0.1
+
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           3.0e-4     # v3 original setting (job 938326 ran with this)
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             5
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       192        # 8 GPUs (4 nodes × 2) × 192 × 2 = 3072 global batch
+      grad_accum_steps: 2
+    adapter:
+      n_tokens: 64
+      dropout:  0.0            # v3 had no dropout
+    dataset:
+      source:        ["wikipedia", "scientific"]   # v3: add scientific to stage 1
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.2                            # v3: 0.1 → 0.2 to enlarge unseen pool
+      recon_ratio:   0.8                            # 80% of train → stage 1 recon; 20% qa (unused)
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b_v3"
+      resume:     true                              # crash-resume support
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen3_4b_v3"
+      lm_lr:               1.0e-4
+      adapter_lr:          3.0e-4
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      min_lr_ratio:        0.033
+      grad_clip:           1.0
+      n_epochs:            4
+      eval_steps:          200
+      batch_size:          32
+      grad_accum_steps:    2
+      lora_target_modules: ["q_proj", "v_proj"]

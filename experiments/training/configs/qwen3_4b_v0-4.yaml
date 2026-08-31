@@ -1,0 +1,62 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  # Stage 1 pretrain实际运行时用的是 r=16/α=32/dropout=0.1（已训完，checkpoints/oracle_act_qwen3_4b_v4-0/best）
+  # 这里的值是给 Stage 2 finetune 用（AO-style LoRA：r=64/α=128，保持 dropout=0.1）
+  lora_r:       64
+  lora_alpha:   128
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# v4-0 changes from v3:
+#   - adapter_lr: 3e-4 → 1.0e-3  (3× larger for faster convergence on 1.6M data)
+#   - n_epochs:   5    → 4       (v3 overfit after epoch 3)
+#   - adapter.dropout: 0.0 → 0.1 (regularise adapter against overfit)
+#   - output_dir: separate checkpoint folder, does not touch v3 results
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           1.0e-3
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             4
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       192
+      grad_accum_steps: 2
+    adapter:
+      type:     "mlp"          # baseline MLPAdapter
+      n_tokens: 64
+      dropout:  0.1
+      n_hidden: 1
+    dataset:
+      source:        ["wikipedia", "scientific"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.2
+      recon_ratio:   0.8
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b_v4-0"
+      resume:     true
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen3_4b_v4-0"
+      lm_lr:               5.0e-5         # AO-style: was 1e-4
+      adapter_lr:          5.0e-4         # adapter jointly trained
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      min_lr_ratio:        0.05
+      grad_clip:           1.0
+      n_epochs:            4
+      eval_steps:          200
+      batch_size:          256            # 80G A100: seq=128, frozen adapter → 充足 headroom
+      grad_accum_steps:    1              # 4 ranks × 256 × 1 = eff batch 1024
+      lora_target_modules: "all-linear"

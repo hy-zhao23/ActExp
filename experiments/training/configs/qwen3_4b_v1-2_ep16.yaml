@@ -1,0 +1,72 @@
+model:
+  name:         "Qwen/Qwen3-4B"
+  lora_r:       16
+  lora_alpha:   32
+  lora_dropout: 0.1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# v1-2 ep16: extend cosine schedule + rely on early stop.
+#   v1-2_ep8 (job 982060) plateaued at eval_loss=1.4234 around step 6000
+#   (epoch ~7.2). ppl ticks 4.15→4.15 — visually still moving but raw loss
+#   identical. Question: was that the model's true ceiling, or did the cosine
+#   collapse to ~0 lr too early?
+#
+#   Strategy: fresh run with cosine over 16 epochs (NOT a continuation of ep8).
+#   At every "epoch X" point, lr is higher than in the ep8 schedule, so the
+#   late-stage updates have more bite. early_stop_patience=6 guards against
+#   wasted compute if it plateaus before ep16.
+#
+#   Changes vs v1-2_ep8:
+#     n_epochs:   8 → 16
+#     output_dir renamed.
+#   (early_stop_patience / min_delta unchanged)
+# ══════════════════════════════════════════════════════════════════════════
+
+training:
+  lm_lr:                5.0e-5
+  adapter_lr:           3.0e-4
+  weight_decay:         0.01
+  warmup_ratio:         0.05
+  grad_clip:            1.0
+  n_epochs:             16
+  eval_steps:           200
+  early_stop_patience:  3
+  early_stop_min_delta: 1.0e-4
+
+tasks:
+  activation:
+    task_training:
+      batch_size:       128
+      grad_accum_steps: 3             # effective global: 128 × 4 × 3 = 1536
+    adapter:
+      type:       "cross_attn"
+      n_tokens:   64
+      dropout:    0.1
+      n_contexts: 8
+      n_heads:    8
+      n_layers:   2
+      ffn_mult:   4
+    dataset:
+      source:        ["wikipedia", "scientific"]
+      n_samples:     null
+      seed:          42
+      test_ratio:    0.2
+      recon_ratio:   0.8
+      max_label_len: 128
+    io:
+      output_dir: "checkpoints/oracle_act_qwen3_4b_v1-2/ep16"
+      resume:     true
+
+    finetune:
+      output_dir:          "checkpoints/oracle_ft_qwen3_4b_v1-2_ep16"
+      lm_lr:               1.0e-4
+      adapter_lr:          3.0e-4
+      weight_decay:        0.01
+      warmup_ratio:        0.1
+      grad_clip:           1.0
+      n_epochs:            4
+      eval_steps:          200
+      batch_size:          32
+      grad_accum_steps:    2
+      lora_target_modules: ["q_proj", "v_proj"]
